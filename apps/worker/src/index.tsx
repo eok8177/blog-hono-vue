@@ -42,13 +42,17 @@ app.use('*', async (c, next) => {
           500,
         );
   }
-  c.res.headers.set('X-Content-Type-Options', 'nosniff');
-  c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  c.res.headers.set(
+  // Static Assets responses use immutable Headers, so always replace the response
+  // with a clone before applying security headers.
+  const headers = new Headers(c.res.headers);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  headers.set(
     'Content-Security-Policy',
     "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'self'; frame-ancestors 'none'",
   );
+  c.res = new Response(c.res.body, { status: c.res.status, statusText: c.res.statusText, headers });
 });
 
 app.get('/robots.txt', (c) =>
@@ -292,6 +296,10 @@ app.get('/media/:id/:variant', async (c) => {
       ETag: object.httpEtag,
     },
   });
+});
+app.get('/admin/assets/*', async (c) => {
+  const pathname = c.req.path.replace(/^\/admin/, '');
+  return c.env.ASSETS.fetch(new Request(new URL(pathname, c.req.url)));
 });
 app.get('/admin/*', async (c) => {
   const asset = await c.env.ASSETS.fetch(new Request(new URL('/admin/index.html', c.req.url)));
