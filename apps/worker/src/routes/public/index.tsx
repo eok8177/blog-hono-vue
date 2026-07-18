@@ -11,7 +11,7 @@ import { requireAdmin } from '../../middleware/auth';
 import { findPost, listPublished } from '../../services/posts';
 import { renderMarkdown } from '../../utils/content';
 import { inspectImage, sha256 } from '../../utils/media';
-import { Layout, Markdown } from '../../views/layout';
+import { Layout, Markdown, SectionLabel } from '../../views/layout';
 
 export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
   async function readSettings(env: AppEnv['Bindings'], key: 'site' | 'home') {
@@ -28,6 +28,28 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
   }
   const settingText = (value: unknown, fallback: string) =>
     typeof value === 'string' && value.trim() ? value : fallback;
+  async function readNavigation(env: AppEnv['Bindings'], locale: 'uk' | 'en') {
+    const titleColumn = locale === 'en' ? 'title_en' : 'title_uk';
+    const translation =
+      locale === 'en' ? ` AND ${titleColumn} IS NOT NULL AND trim(${titleColumn}) <> ''` : '';
+    const rows = await env.DB.prepare(
+      `SELECT 'page' entity_type,slug,${titleColumn} title,menu_order FROM pages WHERE status='published' AND show_in_menu=1${translation}
+       UNION ALL
+       SELECT 'category' entity_type,slug,${titleColumn} title,menu_order FROM categories WHERE status='published' AND show_in_menu=1${locale === 'en' ? ` AND is_en_published=1${translation}` : ''}
+       ORDER BY menu_order ASC, title ASC LIMIT 20`,
+    ).all<{ entity_type: 'page' | 'category'; slug: string; title: string; menu_order: number }>();
+    return rows.results.map((item) => ({
+      label: item.title,
+      href:
+        locale === 'en'
+          ? item.entity_type === 'page'
+            ? `/en/${item.slug}`
+            : `/en/category/${item.slug}`
+          : item.entity_type === 'page'
+            ? `/${item.slug}`
+            : `/category/${item.slug}`,
+    }));
+  }
   app.get('/api/search', async (c) => {
     const requestedLocale = c.req.query('locale') ?? 'uk';
     if (requestedLocale !== 'uk' && requestedLocale !== 'en')
@@ -58,71 +80,140 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     );
   });
 
-  app.get('/', async (c) => {
-    const [posts, settings, site] = await Promise.all([
-      listPublished(c.env, 'uk'),
+  async function renderHome(c: Context<AppEnv>, locale: 'uk' | 'en') {
+    const [posts, settings, site, categories] = await Promise.all([
+      listPublished(c.env, locale),
       readSettings(c.env, 'home'),
       readSettings(c.env, 'site'),
+      c.env.DB.prepare(
+        `SELECT slug,title_${locale} title FROM categories WHERE status='published'${locale === 'en' ? ' AND is_en_published=1' : ''} ORDER BY menu_order, title LIMIT 6`,
+      ).all<{ slug: string; title: string }>(),
     ]);
     const title = settingText(
-      settings.heroTitleUk,
-      settingText(site.titleUk, 'Архів фауни півдня України'),
+      settings[locale === 'en' ? 'heroTitleEn' : 'heroTitleUk'],
+      settingText(
+        site[locale === 'en' ? 'titleEn' : 'titleUk'],
+        locale === 'en' ? 'Fauna of Southern Ukraine' : 'Фауна півдня України',
+      ),
     );
+    const intro = settingText(
+      settings[locale === 'en' ? 'introEn' : 'introUk'],
+      locale === 'en'
+        ? 'A living archive of observations, field notes and research from the southern Ukrainian landscape.'
+        : 'Живий архів спостережень, польових нотаток і досліджень ландшафтів півдня України.',
+    );
+    const basePath = locale === 'en' ? '/en' : '';
+    const menuItems = await readNavigation(c.env, locale);
     return c.html(
       <Layout
         nonce={c.get('cspNonce')}
-        lang="uk"
+        lang={locale}
         title={title}
-        description={settingText(site.descriptionUk, 'Дослідницький архів')}
+        description={settingText(site[locale === 'en' ? 'descriptionEn' : 'descriptionUk'], intro)}
+        menuItems={menuItems}
       >
-        <h1>{title}</h1>
-        <p>
-          {settingText(
-            settings.introUk,
-            'Електронний архів спостережень, матеріалів і досліджень.',
-          )}
-        </p>
-        {posts.results.map((p: { slug: string; title: string; excerpt: string | null }) => (
-          <article class="card">
-            <h2>
-              <a href={`/post/${p.slug}`}>{p.title}</a>
-            </h2>
-            <p>{p.excerpt}</p>
-          </article>
-        ))}
+        <section class="hero" aria-labelledby="home-title">
+          <span class="hero-orbit hero-orbit-left" aria-hidden="true" />
+          <span class="hero-orbit hero-orbit-right" aria-hidden="true" />
+          <div class="hero-inner">
+            <p class="eyebrow">
+              {locale === 'en' ? 'A field archive · since 2024' : 'Польовий архів · з 2024 року'}
+            </p>
+            <h1 id="home-title">{title}</h1>
+            <p class="hero-intro">{intro}</p>
+            <div class="hero-rule" aria-hidden="true">
+              {locale === 'en' ? 'in careful observation' : 'у уважному спостереженні'}
+            </div>
+          </div>
+        </section>
+        <section class="section" aria-labelledby="recent-title">
+          <div class="shell">
+            <SectionLabel>{locale === 'en' ? 'The archive' : 'Архів'}</SectionLabel>
+            <div class="section-heading">
+              <h2 id="recent-title">
+                {locale === 'en' ? 'Recent observations' : 'Останні спостереження'}
+              </h2>
+              <p>
+                {locale === 'en'
+                  ? 'Notes from years of patient attention to the steppe, coast and wetlands.'
+                  : 'Нотатки з років уважного спостереження за степом, узбережжям і водно-болотними угіддями.'}
+              </p>
+            </div>
+            <div class="archive-grid">
+              {posts.results
+                .slice(0, 6)
+                .map(
+                  (p: {
+                    slug: string;
+                    title: string;
+                    excerpt: string | null;
+                    published_at?: string;
+                  }) => (
+                    <article class="card" key={p.slug}>
+                      <p class="post-meta">
+                        {p.published_at
+                          ? new Date(p.published_at).toLocaleDateString(
+                              locale === 'uk' ? 'uk-UA' : 'en-GB',
+                              { year: 'numeric', month: 'short' },
+                            )
+                          : locale === 'en'
+                            ? 'Archive note'
+                            : 'Архівна нотатка'}
+                      </p>
+                      <h2>
+                        <a href={`${basePath}/post/${p.slug}`}>{p.title}</a>
+                      </h2>
+                      <p>
+                        {p.excerpt ||
+                          (locale === 'en'
+                            ? 'Read the full field note.'
+                            : 'Переглянути повну польову нотатку.')}
+                      </p>
+                      <a class="read-more" href={`${basePath}/post/${p.slug}`}>
+                        {locale === 'en' ? 'Read note' : 'Читати нотатку'}
+                      </a>
+                    </article>
+                  ),
+                )}
+            </div>
+            {!posts.results.length ? (
+              <p class="empty-state">
+                {locale === 'en'
+                  ? 'The first observations will appear here soon.'
+                  : 'Перші спостереження скоро з’являться тут.'}
+              </p>
+            ) : null}
+          </div>
+        </section>
+        <section class="section" aria-labelledby="categories-title">
+          <div class="shell archive-note">
+            <div>
+              <p class="eyebrow">{locale === 'en' ? 'Ways into the archive' : 'Розділи архіву'}</p>
+              <h2 id="categories-title">
+                {locale === 'en'
+                  ? 'A landscape is never just one story.'
+                  : 'Ландшафт ніколи не є лише однією історією.'}
+              </h2>
+            </div>
+            <div>
+              <p class="note-mark">
+                {locale === 'en' ? 'Explore by subject' : 'Досліджуйте за темою'}
+              </p>
+              {categories.results.map((category) => (
+                <p key={category.slug}>
+                  <a class="text-link" href={`${basePath}/category/${category.slug}`}>
+                    {category.title}
+                  </a>
+                </p>
+              ))}
+            </div>
+          </div>
+        </section>
       </Layout>,
     );
-  });
-  app.get('/en/', async (c) => {
-    const [posts, settings, site] = await Promise.all([
-      listPublished(c.env, 'en'),
-      readSettings(c.env, 'home'),
-      readSettings(c.env, 'site'),
-    ]);
-    const title = settingText(
-      settings.heroTitleEn,
-      settingText(site.titleEn, 'Fauna Archive of Southern Ukraine'),
-    );
-    return c.html(
-      <Layout
-        nonce={c.get('cspNonce')}
-        lang="en"
-        title={title}
-        description={settingText(site.descriptionEn, 'Research archive')}
-      >
-        <h1>{title}</h1>
-        <p>{settingText(settings.introEn, 'A research archive of observations and materials.')}</p>
-        {posts.results.map((p: { slug: string; title: string; excerpt: string | null }) => (
-          <article class="card">
-            <h2>
-              <a href={`/en/post/${p.slug}`}>{p.title}</a>
-            </h2>
-            <p>{p.excerpt}</p>
-          </article>
-        ))}
-      </Layout>,
-    );
-  });
+  }
+  app.get('/', (c) => renderHome(c, 'uk'));
+  app.get('/en/', (c) => renderHome(c, 'en'));
   app.get('/post/:slug', async (c) => renderPost(c, 'uk'));
   app.get('/en/post/:slug', async (c) => renderPost(c, 'en'));
   async function renderPost(c: Context<AppEnv>, locale: 'uk' | 'en') {
@@ -155,6 +246,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     const ukHref = `${base}/post/${slug}`;
     const enHref = `${base}/en/post/${slug}`;
     const hasEnglish = Number(post.is_en_published) === 1;
+    const menuItems = await readNavigation(c.env, locale);
     return c.html(
       <Layout
         nonce={c.get('cspNonce')}
@@ -162,6 +254,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
         title={title}
         description={String(post[locale === 'en' ? 'excerpt_en' : 'excerpt_uk'] ?? '')}
         canonical={locale === 'en' ? enHref : ukHref}
+        menuItems={menuItems}
         languageHref={locale === 'en' ? ukHref : hasEnglish ? enHref : '/en/'}
         jsonLd={{
           '@context': 'https://schema.org',
@@ -186,35 +279,56 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
             : []
         }
       >
-        <article>
-          <h1>{title}</h1>
-          <Markdown html={renderMarkdown(body)} />
-          {gallery.results.length ? (
-            <section aria-label="Галерея">
-              <h2>Галерея</h2>
-              {gallery.results.map(
-                (image: {
-                  id: string;
-                  width: number;
-                  height: number;
-                  alt: string | null;
-                  caption: string | null;
-                }) => (
-                  <figure>
-                    <img
-                      src={`/media/${image.id}/960`}
-                      alt={image.alt ?? ''}
-                      width={image.width}
-                      height={image.height}
-                      loading="lazy"
-                    />
-                    {image.caption ? <figcaption>{image.caption}</figcaption> : null}
-                  </figure>
-                ),
-              )}
-            </section>
-          ) : null}
-        </article>
+        <div class="page-shell narrow">
+          <nav class="breadcrumb" aria-label={locale === 'uk' ? 'Навігація' : 'Breadcrumb'}>
+            <a href={locale === 'en' ? '/en/' : '/'}>{locale === 'en' ? 'Archive' : 'Архів'}</a>
+            <span aria-hidden="true"> / </span>
+            <a href={locale === 'en' ? '/en/category/doslidzhennia' : '/category/doslidzhennia'}>
+              {locale === 'en' ? 'Research' : 'Дослідження'}
+            </a>
+          </nav>
+          <article>
+            <header class="post-header">
+              <p class="post-meta">
+                <span>{locale === 'uk' ? 'Публікація' : 'Field note'}</span>
+                {post.published_at ? (
+                  <time dateTime={String(post.published_at)}>
+                    {new Date(String(post.published_at)).toLocaleDateString(
+                      locale === 'uk' ? 'uk-UA' : 'en-GB',
+                      { year: 'numeric', month: 'long', day: 'numeric' },
+                    )}
+                  </time>
+                ) : null}
+              </p>
+              <h1 class="page-title">{title}</h1>
+              {post[locale === 'en' ? 'excerpt_en' : 'excerpt_uk'] ? (
+                <p class="lede">{String(post[locale === 'en' ? 'excerpt_en' : 'excerpt_uk'])}</p>
+              ) : null}
+            </header>
+            <div class="post-body">
+              <Markdown html={renderMarkdown(body)} />
+            </div>
+            {gallery.results.length ? (
+              <section class="gallery" aria-label={locale === 'uk' ? 'Галерея' : 'Gallery'}>
+                <h2>{locale === 'uk' ? 'Галерея спостережень' : 'Observation gallery'}</h2>
+                <div class="gallery-grid">
+                  {gallery.results.map((image) => (
+                    <figure key={image.id}>
+                      <img
+                        src={`/media/${image.id}/960`}
+                        alt={image.alt ?? ''}
+                        width={image.width}
+                        height={image.height}
+                        loading="lazy"
+                      />
+                      {image.caption ? <figcaption>{image.caption}</figcaption> : null}
+                    </figure>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </article>
+        </div>
       </Layout>,
     );
   }
@@ -246,57 +360,87 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
           }>,
         };
     const path = locale === 'en' ? '/en/search' : '/search';
+    const menuItems = await readNavigation(c.env, locale);
     return c.html(
       <Layout
         nonce={c.get('cspNonce')}
         lang={locale}
         title={locale === 'uk' ? 'Пошук' : 'Search'}
         robots="noindex,follow"
+        menuItems={menuItems}
         canonical={`${c.env.SITE_URL.replace(/\/$/, '')}${path}`}
       >
-        <h1>{locale === 'uk' ? 'Пошук' : 'Search'}</h1>
-        <form action={path}>
-          <label>
-            Запит <input name="q" minLength={2} value={rawQuery} />
-          </label>
-          <button>{locale === 'uk' ? 'Шукати' : 'Search'}</button>
-        </form>
-        {rawQuery ? (
-          <section aria-live="polite">
-            <h2>{locale === 'uk' ? 'Результати' : 'Results'}</h2>
-            {result.results.length ? (
-              result.results.map(
-                (item: {
-                  entity_type: 'post' | 'page';
-                  slug: string;
-                  title: string;
-                  summary: string;
-                }) => (
-                  <article class="card">
-                    <h3>
-                      <a
-                        href={
-                          item.entity_type === 'post'
-                            ? locale === 'en'
-                              ? `/en/post/${item.slug}`
-                              : `/post/${item.slug}`
-                            : locale === 'en'
-                              ? `/en/${item.slug}`
-                              : `/${item.slug}`
-                        }
-                      >
-                        {item.title}
-                      </a>
-                    </h3>
-                    <p>{item.summary}</p>
-                  </article>
-                ),
-              )
-            ) : (
-              <p>{locale === 'uk' ? 'Нічого не знайдено.' : 'No results found.'}</p>
-            )}
-          </section>
-        ) : null}
+        <div class="page-shell">
+          <p class="eyebrow">{locale === 'uk' ? 'Пошук в архіві' : 'Search the archive'}</p>
+          <h1 class="page-title">
+            {locale === 'uk' ? 'Знайти спостереження' : 'Find an observation'}
+          </h1>
+          <p class="lede">
+            {locale === 'uk'
+              ? 'Пошук за назвою та змістом опублікованих матеріалів.'
+              : 'Search titles and full text across published materials.'}
+          </p>
+          <form class="search-form" action={path}>
+            <label class="visually-hidden" htmlFor="archive-search">
+              {locale === 'uk' ? 'Запит' : 'Query'}
+            </label>
+            <input
+              class="search-input"
+              id="archive-search"
+              name="q"
+              minLength={2}
+              value={rawQuery}
+              placeholder={
+                locale === 'uk' ? 'Наприклад, степ або птахи' : 'For example, steppe or birds'
+              }
+            />
+            <button class="button" type="submit">
+              {locale === 'uk' ? 'Шукати' : 'Search'}
+            </button>
+          </form>
+          {rawQuery ? (
+            <section aria-live="polite">
+              <SectionLabel>{locale === 'uk' ? 'Результати' : 'Results'}</SectionLabel>
+              {result.results.length ? (
+                <div class="search-results">
+                  {result.results.map((item) => (
+                    <article class="card">
+                      <p class="post-meta">
+                        {item.entity_type === 'post'
+                          ? locale === 'uk'
+                            ? 'Публікація'
+                            : 'Publication'
+                          : locale === 'uk'
+                            ? 'Сторінка'
+                            : 'Page'}
+                      </p>
+                      <h2>
+                        <a
+                          href={
+                            item.entity_type === 'post'
+                              ? locale === 'en'
+                                ? `/en/post/${item.slug}`
+                                : `/post/${item.slug}`
+                              : locale === 'en'
+                                ? `/en/${item.slug}`
+                                : `/${item.slug}`
+                          }
+                        >
+                          {item.title}
+                        </a>
+                      </h2>
+                      <p>{item.summary}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p class="empty-state">
+                  {locale === 'uk' ? 'Нічого не знайдено.' : 'No results found.'}
+                </p>
+              )}
+            </section>
+          ) : null}
+        </div>
       </Layout>,
     );
   }
@@ -327,6 +471,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     const enHref = `${base}/en/category/${slug}${suffix}`;
     const hasEnglish = Number(category.is_en_published) === 1;
     const title = String(category[locale === 'en' ? 'title_en' : 'title_uk']);
+    const menuItems = await readNavigation(c.env, locale);
     const total = (queries[1]!.results[0] as { count: number }).count;
     const pages = Math.max(1, Math.ceil(total / p.pageSize));
     const posts = queries[0]!.results as Array<{
@@ -343,6 +488,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
           category[locale === 'en' ? 'description_md_en' : 'description_md_uk'] ?? '',
         )}
         canonical={canonical}
+        menuItems={menuItems}
         languageHref={locale === 'en' ? ukHref : hasEnglish ? enHref : '/en/'}
         alternates={
           locale === 'en' || hasEnglish
@@ -358,28 +504,75 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
             : []
         }
       >
-        <nav aria-label="Breadcrumb">
-          <a href={locale === 'en' ? '/en/' : '/'}>Архів</a> / {title}
-        </nav>
-        <h1>{title}</h1>
-        {posts.length ? (
-          posts.map((post) => (
-            <article class="card">
-              <h2>
-                <a href={locale === 'en' ? `/en/post/${post.slug}` : `/post/${post.slug}`}>
-                  {String(post.title)}
-                </a>
-              </h2>
-              <p>{String(post.excerpt ?? '')}</p>
-            </article>
-          ))
-        ) : (
-          <p>У цій категорії ще немає опублікованих матеріалів.</p>
-        )}
-        <nav aria-label="Пагінація">
-          {p.page > 1 ? <a href={`${basePath}?page=${p.page - 1}`}>← Попередня</a> : null}
-          {p.page < pages ? <a href={`${basePath}?page=${p.page + 1}`}>Наступна →</a> : null}
-        </nav>
+        <div class="page-shell">
+          <nav class="breadcrumb" aria-label={locale === 'uk' ? 'Навігація' : 'Breadcrumb'}>
+            <a href={locale === 'en' ? '/en/' : '/'}>{locale === 'en' ? 'Archive' : 'Архів'}</a>
+            <span aria-hidden="true"> / </span>
+            {locale === 'en' ? 'Research' : 'Дослідження'}
+          </nav>
+          <header class="listing-header">
+            <div>
+              <p class="eyebrow">{locale === 'en' ? 'Field notes' : 'Польові нотатки'}</p>
+              <h1>{title}</h1>
+            </div>
+            <p>
+              {String(
+                category[locale === 'en' ? 'description_md_en' : 'description_md_uk'] ??
+                  (locale === 'en'
+                    ? 'Observations gathered across the southern landscape.'
+                    : 'Спостереження, зібрані в ландшафтах півдня України.'),
+              )}
+            </p>
+          </header>
+          {posts.length ? (
+            <div class="post-list">
+              {posts.map((post) => (
+                <article class="listing-card">
+                  <p class="post-meta">{locale === 'en' ? 'Publication' : 'Публікація'}</p>
+                  <div>
+                    <h2>
+                      <a href={locale === 'en' ? `/en/post/${post.slug}` : `/post/${post.slug}`}>
+                        {String(post.title)}
+                      </a>
+                    </h2>
+                    <p>{String(post.excerpt ?? '')}</p>
+                  </div>
+                  <a
+                    class="listing-arrow"
+                    aria-label={
+                      locale === 'en'
+                        ? `Read ${String(post.title)}`
+                        : `Читати ${String(post.title)}`
+                    }
+                    href={locale === 'en' ? `/en/post/${post.slug}` : `/post/${post.slug}`}
+                  >
+                    ↗
+                  </a>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p class="empty-state">
+              {locale === 'en'
+                ? 'No published observations in this category yet.'
+                : 'У цій категорії ще немає опублікованих матеріалів.'}
+            </p>
+          )}
+          <nav class="pagination" aria-label={locale === 'uk' ? 'Пагінація' : 'Pagination'}>
+            {p.page > 1 ? (
+              <a href={`${basePath}?page=${p.page - 1}`}>
+                ← {locale === 'en' ? 'Previous' : 'Попередня'}
+              </a>
+            ) : (
+              <span />
+            )}
+            {p.page < pages ? (
+              <a href={`${basePath}?page=${p.page + 1}`}>
+                {locale === 'en' ? 'Next' : 'Наступна'} →
+              </a>
+            ) : null}
+          </nav>
+        </div>
       </Layout>,
     );
   }
@@ -662,12 +855,14 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     const ukHref = `${base}/${slug}`;
     const enHref = `${base}/en/${slug}`;
     const hasEnglish = Number(page.is_en_published) === 1;
+    const menuItems = await readNavigation(c.env, locale);
     return c.html(
       <Layout
         nonce={c.get('cspNonce')}
         lang={locale}
         title={title}
         canonical={locale === 'en' ? enHref : ukHref}
+        menuItems={menuItems}
         languageHref={locale === 'en' ? ukHref : hasEnglish ? enHref : '/en/'}
         alternates={
           locale === 'en' || hasEnglish
@@ -683,10 +878,20 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
             : []
         }
       >
-        <article>
-          <h1>{title}</h1>
-          <Markdown html={renderMarkdown(body)} />
-        </article>
+        <div class="page-shell narrow">
+          <nav class="breadcrumb" aria-label={locale === 'uk' ? 'Навігація' : 'Breadcrumb'}>
+            <a href={locale === 'en' ? '/en/' : '/'}>{locale === 'en' ? 'Archive' : 'Архів'}</a>
+            <span aria-hidden="true"> / </span>
+            {title}
+          </nav>
+          <article>
+            <p class="eyebrow">{locale === 'en' ? 'About the archive' : 'Про архів'}</p>
+            <h1 class="page-title">{title}</h1>
+            <div class="post-body">
+              <Markdown html={renderMarkdown(body)} />
+            </div>
+          </article>
+        </div>
       </Layout>,
     );
   }

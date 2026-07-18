@@ -4,6 +4,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import App from './App.vue';
 import router from './router';
 import './style.css';
+//import './serif-overrides.css';
 createApp(App)
   .use(createPinia())
   .use(router)
