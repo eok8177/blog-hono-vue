@@ -82,13 +82,14 @@ const save = useMutation({
     message.value = e instanceof ApiError ? e.message : 'Не вдалося оновити metadata.';
   },
 });
-async function archive(item: Media) {
-  if (!confirm(`Архівувати «${item.alt_uk}»?`)) return;
+async function remove(item: Media) {
+  if (!confirm(`Повністю видалити «${item.alt_uk}» разом із R2-файлами?`)) return;
   try {
     await api(`/media/${item.id}`, { method: 'DELETE' });
+    message.value = 'Файл повністю видалено.';
     await client.invalidateQueries({ queryKey: ['media'] });
   } catch (e) {
-    message.value = e instanceof ApiError ? e.message : 'Не вдалося архівувати файл.';
+    message.value = e instanceof ApiError ? e.message : 'Не вдалося повністю видалити файл.';
   }
 }
 </script>
@@ -132,7 +133,7 @@ async function archive(item: Media) {
         />
         <p>{{ item.alt_uk }} · {{ item.width }}×{{ item.height }}</p>
         <button @click="edit(item)">Редагувати</button>
-        <button @click="archive(item)">Архівувати</button>
+        <button @click="remove(item)">Видалити назавжди</button>
       </article>
     </div>
   </section>

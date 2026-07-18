@@ -1,16 +1,21 @@
 {
   "name": "fauna-south-ukraine-archive",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "pnpm --filter @fauna/admin build && concurrently -k -n admin,worker -c cyan,green \"pnpm --filter @fauna/admin build --watch\" \"pnpm --filter @fauna/worker dev\"",
-    "build": "pnpm --filter @fauna/admin build && pnpm --filter @fauna/worker build",
+    "build": "pnpm validate:config && pnpm --filter @fauna/admin build && pnpm --filter @fauna/worker build",
+    "validate:config": "node scripts/validate-config.mjs",
+    "validate:production": "node scripts/validate-config.mjs --production",
+    "types:check": "pnpm exec wrangler types --check",
+    "deploy:production": "pnpm validate:production && pnpm exec wrangler deploy --env production",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --config=playwright.config.ts",
     "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
     "db:migrate:local": "wrangler d1 migrations apply fauna-archive-dev --local",
     "db:seed:local": "wrangler d1 execute fauna-archive-dev --local --file scripts/seed.sql"
@@ -21,10 +26,12 @@
     "@types/node": "^24.10.1",
     "concurrently": "^10.0.3",
     "eslint": "^9.39.1",
+    "eslint-plugin-vue": "^10.9.2",
     "prettier": "^3.6.2",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.3",
+    "vue-eslint-parser": "^10.4.1",
     "wrangler": "4.112.0"
   }
 }

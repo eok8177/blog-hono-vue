@@ -33,8 +33,11 @@ const form = reactive({
   menuOrder: 0,
   version: '',
 });
-const pages = useQuery({ queryKey: ['pages'], queryFn: () => api<Page[]>('/pages') });
-const items = computed(() => pages.data.value ?? []);
+const pages = useQuery({
+  queryKey: ['pages'],
+  queryFn: () => api<{ items: Page[]; total: number }>('/pages'),
+});
+const items = computed(() => pages.data.value?.items ?? []);
 const isLoading = computed(() => pages.isPending.value);
 function reset() {
   selectedId.value = undefined;
@@ -86,13 +89,15 @@ const save = useMutation({
   },
 });
 const isSaving = computed(() => save.isPending.value);
-async function archive(item: Page) {
-  if (!confirm(`Архівувати «${item.title_uk}»?`)) return;
+async function remove(item: Page) {
+  if (!confirm(`Повністю видалити сторінку «${item.title_uk}»? Цю дію неможливо скасувати.`))
+    return;
   try {
     await api(`/pages/${item.id}`, { method: 'DELETE' });
     await client.invalidateQueries({ queryKey: ['pages'] });
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не вдалося архівувати сторінку.';
+    error.value =
+      cause instanceof ApiError ? cause.message : 'Не вдалося повністю видалити сторінку.';
   }
 }
 </script>
@@ -129,7 +134,6 @@ async function archive(item: Page) {
         <select v-model="form.status">
           <option>draft</option>
           <option>published</option>
-          <option>archived</option>
         </select></label
       ><button :disabled="isSaving">{{ isSaving ? 'Збереження…' : 'Зберегти' }}</button
       ><button
@@ -159,7 +163,7 @@ async function archive(item: Page) {
           <td>{{ item.status }}</td>
           <td>
             <button @click="edit(item)">Редагувати</button>
-            <button @click="archive(item)">Архівувати</button>
+            <button @click="remove(item)">Видалити назавжди</button>
           </td>
         </tr>
       </tbody>

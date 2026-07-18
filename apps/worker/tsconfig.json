@@ -5,5 +5,5 @@
     "jsxImportSource": "hono/jsx",
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "../../worker-configuration.d.ts"]
 }

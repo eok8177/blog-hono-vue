@@ -7,32 +7,82 @@ import {
   paginationSchema,
 } from '@fauna/shared';
 import type { AppEnv } from '../../index';
+import { requireAdmin } from '../../middleware/auth';
 import { findPost, listPublished } from '../../services/posts';
 import { renderMarkdown } from '../../utils/content';
 import { inspectImage, sha256 } from '../../utils/media';
 import { Layout, Markdown } from '../../views/layout';
 
 export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
+  async function readSettings(env: AppEnv['Bindings'], key: 'site' | 'home') {
+    const row = await env.DB.prepare('SELECT value_json FROM settings WHERE key=?')
+      .bind(key)
+      .first<{ value_json: string }>();
+    if (!row) return {} as Record<string, unknown>;
+    try {
+      const value: unknown = JSON.parse(row.value_json);
+      return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    } catch {
+      return {} as Record<string, unknown>;
+    }
+  }
+  const settingText = (value: unknown, fallback: string) =>
+    typeof value === 'string' && value.trim() ? value : fallback;
   app.get('/api/search', async (c) => {
-    const locale = c.req.query('locale') === 'en' ? 'en' : 'uk';
+    const requestedLocale = c.req.query('locale') ?? 'uk';
+    if (requestedLocale !== 'uk' && requestedLocale !== 'en')
+      return c.json(apiError('INVALID_LOCALE', 'Підтримуються лише locale uk або en'), 422);
+    const locale = requestedLocale;
     const query = ftsPrefixQuery(c.req.query('q') ?? '');
-    if (!query) return c.json(apiSuccess({ items: [], query: '' }));
     const p = paginationSchema.parse(c.req.query());
-    const result = await c.env.DB.prepare(
-      'SELECT entity_type,entity_id,title,summary FROM content_fts WHERE content_fts MATCH ? AND locale=? LIMIT ? OFFSET ?',
-    )
-      .bind(query, locale, p.pageSize, (p.page - 1) * p.pageSize)
-      .all();
-    return c.json(apiSuccess({ items: result.results, query: c.req.query('q') ?? '' }));
+    if (!query)
+      return c.json(
+        apiSuccess({ items: [], total: 0, query: '', page: p.page, pageSize: p.pageSize }),
+      );
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        'SELECT entity_type,entity_id,title,summary FROM content_fts WHERE content_fts MATCH ? AND locale=? LIMIT ? OFFSET ?',
+      ).bind(query, locale, p.pageSize, (p.page - 1) * p.pageSize),
+      c.env.DB.prepare(
+        'SELECT count(*) count FROM content_fts WHERE content_fts MATCH ? AND locale=?',
+      ).bind(query, locale),
+    ]);
+    return c.json(
+      apiSuccess({
+        items: results[0]!.results,
+        total: Number((results[1]!.results[0] as { count: number }).count),
+        query: c.req.query('q') ?? '',
+        page: p.page,
+        pageSize: p.pageSize,
+      }),
+    );
   });
 
   app.get('/', async (c) => {
-    const posts = await listPublished(c.env, 'uk');
+    const [posts, settings, site] = await Promise.all([
+      listPublished(c.env, 'uk'),
+      readSettings(c.env, 'home'),
+      readSettings(c.env, 'site'),
+    ]);
+    const title = settingText(
+      settings.heroTitleUk,
+      settingText(site.titleUk, 'Архів фауни півдня України'),
+    );
     return c.html(
-      <Layout lang="uk" title="Архів фауни півдня України" description="Дослідницький архів">
-        <h1>Архів фауни півдня України</h1>
-        <p>Тестовий електронний архів спостережень, матеріалів і досліджень.</p>
-        {posts.results.map((p) => (
+      <Layout
+        nonce={c.get('cspNonce')}
+        lang="uk"
+        title={title}
+        description={settingText(site.descriptionUk, 'Дослідницький архів')}
+      >
+        <h1>{title}</h1>
+        <p>
+          {settingText(
+            settings.introUk,
+            'Електронний архів спостережень, матеріалів і досліджень.',
+          )}
+        </p>
+        {posts.results.map((p: { slug: string; title: string; excerpt: string | null }) => (
           <article class="card">
             <h2>
               <a href={`/post/${p.slug}`}>{p.title}</a>
@@ -44,11 +94,25 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     );
   });
   app.get('/en/', async (c) => {
-    const posts = await listPublished(c.env, 'en');
+    const [posts, settings, site] = await Promise.all([
+      listPublished(c.env, 'en'),
+      readSettings(c.env, 'home'),
+      readSettings(c.env, 'site'),
+    ]);
+    const title = settingText(
+      settings.heroTitleEn,
+      settingText(site.titleEn, 'Fauna Archive of Southern Ukraine'),
+    );
     return c.html(
-      <Layout lang="en" title="Fauna Archive of Southern Ukraine">
-        <h1>Fauna Archive of Southern Ukraine</h1>
-        {posts.results.map((p) => (
+      <Layout
+        nonce={c.get('cspNonce')}
+        lang="en"
+        title={title}
+        description={settingText(site.descriptionEn, 'Research archive')}
+      >
+        <h1>{title}</h1>
+        <p>{settingText(settings.introEn, 'A research archive of observations and materials.')}</p>
+        {posts.results.map((p: { slug: string; title: string; excerpt: string | null }) => (
           <article class="card">
             <h2>
               <a href={`/en/post/${p.slug}`}>{p.title}</a>
@@ -93,6 +157,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     const hasEnglish = Number(post.is_en_published) === 1;
     return c.html(
       <Layout
+        nonce={c.get('cspNonce')}
         lang={locale}
         title={title}
         description={String(post[locale === 'en' ? 'excerpt_en' : 'excerpt_uk'] ?? '')}
@@ -127,18 +192,26 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
           {gallery.results.length ? (
             <section aria-label="Галерея">
               <h2>Галерея</h2>
-              {gallery.results.map((image) => (
-                <figure>
-                  <img
-                    src={`/media/${image.id}/960`}
-                    alt={image.alt ?? ''}
-                    width={image.width}
-                    height={image.height}
-                    loading="lazy"
-                  />
-                  {image.caption ? <figcaption>{image.caption}</figcaption> : null}
-                </figure>
-              ))}
+              {gallery.results.map(
+                (image: {
+                  id: string;
+                  width: number;
+                  height: number;
+                  alt: string | null;
+                  caption: string | null;
+                }) => (
+                  <figure>
+                    <img
+                      src={`/media/${image.id}/960`}
+                      alt={image.alt ?? ''}
+                      width={image.width}
+                      height={image.height}
+                      loading="lazy"
+                    />
+                    {image.caption ? <figcaption>{image.caption}</figcaption> : null}
+                  </figure>
+                ),
+              )}
             </section>
           ) : null}
         </article>
@@ -175,6 +248,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     const path = locale === 'en' ? '/en/search' : '/search';
     return c.html(
       <Layout
+        nonce={c.get('cspNonce')}
         lang={locale}
         title={locale === 'uk' ? 'Пошук' : 'Search'}
         robots="noindex,follow"
@@ -191,26 +265,33 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
           <section aria-live="polite">
             <h2>{locale === 'uk' ? 'Результати' : 'Results'}</h2>
             {result.results.length ? (
-              result.results.map((item) => (
-                <article class="card">
-                  <h3>
-                    <a
-                      href={
-                        item.entity_type === 'post'
-                          ? locale === 'en'
-                            ? `/en/post/${item.slug}`
-                            : `/post/${item.slug}`
-                          : locale === 'en'
-                            ? `/en/${item.slug}`
-                            : `/${item.slug}`
-                      }
-                    >
-                      {item.title}
-                    </a>
-                  </h3>
-                  <p>{item.summary}</p>
-                </article>
-              ))
+              result.results.map(
+                (item: {
+                  entity_type: 'post' | 'page';
+                  slug: string;
+                  title: string;
+                  summary: string;
+                }) => (
+                  <article class="card">
+                    <h3>
+                      <a
+                        href={
+                          item.entity_type === 'post'
+                            ? locale === 'en'
+                              ? `/en/post/${item.slug}`
+                              : `/post/${item.slug}`
+                            : locale === 'en'
+                              ? `/en/${item.slug}`
+                              : `/${item.slug}`
+                        }
+                      >
+                        {item.title}
+                      </a>
+                    </h3>
+                    <p>{item.summary}</p>
+                  </article>
+                ),
+              )
             ) : (
               <p>{locale === 'uk' ? 'Нічого не знайдено.' : 'No results found.'}</p>
             )}
@@ -255,6 +336,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     }>;
     return c.html(
       <Layout
+        nonce={c.get('cspNonce')}
         lang={locale}
         title={title}
         description={String(
@@ -305,12 +387,25 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
   app.get('/en/category/:slug', (c) => renderCategory(c, 'en'));
   app.get('/api/admin/media', async (c) => {
     const p = paginationSchema.parse(c.req.query());
-    const result = await c.env.DB.prepare(
-      'SELECT id,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,alt_uk,alt_en,caption_uk,caption_en,credit,license,status,created_at,updated_at FROM media ORDER BY created_at DESC LIMIT ? OFFSET ?',
-    )
-      .bind(p.pageSize, (p.page - 1) * p.pageSize)
-      .all();
-    return c.json(apiSuccess({ items: result.results, page: p.page, pageSize: p.pageSize }));
+    const search = (c.req.query('q') ?? '').slice(0, 100);
+    const where = search
+      ? 'WHERE alt_uk LIKE ? OR alt_en LIKE ? OR caption_uk LIKE ? OR caption_en LIKE ?'
+      : '';
+    const args = search ? Array(4).fill(`%${search}%`) : [];
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `SELECT id,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,alt_uk,alt_en,caption_uk,caption_en,credit,license,status,created_at,updated_at FROM media ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      ).bind(...args, p.pageSize, (p.page - 1) * p.pageSize),
+      c.env.DB.prepare(`SELECT count(*) count FROM media ${where}`).bind(...args),
+    ]);
+    return c.json(
+      apiSuccess({
+        items: results[0]!.results,
+        total: Number((results[1]!.results[0] as { count: number }).count),
+        page: p.page,
+        pageSize: p.pageSize,
+      }),
+    );
   });
   app.get('/api/admin/media/:id', async (c) => {
     const row = await c.env.DB.prepare('SELECT * FROM media WHERE id=?')
@@ -341,17 +436,77 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
       ? c.json(apiSuccess({ id: c.req.param('id'), updatedAt: t }))
       : c.json(apiError('CONFLICT', 'Файл змінився або не існує'), 409);
   });
+  app.use('/api/admin/media/:id', requireAdmin);
   app.delete('/api/admin/media/:id', async (c) => {
-    const result = await c.env.DB.prepare(
-      "UPDATE media SET status='archived',updated_at=? WHERE id=? AND status<>'archived'",
+    const id = c.req.param('id');
+    const media = await c.env.DB.prepare(
+      'SELECT original_key,variant_480_key,variant_960_key,variant_1600_key FROM media WHERE id=?',
     )
-      .bind(new Date().toISOString(), c.req.param('id'))
-      .run();
-    return result.meta.changes
-      ? c.json(apiSuccess({ id: c.req.param('id'), status: 'archived' }))
-      : c.json(apiError('NOT_FOUND', 'Файл не знайдено або вже archived'), 404);
+      .bind(id)
+      .first<{
+        original_key: string | null;
+        variant_480_key: string | null;
+        variant_960_key: string | null;
+        variant_1600_key: string | null;
+      }>();
+    if (!media) return c.json(apiError('NOT_FOUND', 'Файл не знайдено'), 404);
+    const relations = await c.env.DB.batch([
+      c.env.DB.prepare('SELECT count(*) count FROM post_media WHERE media_id=?').bind(id),
+      c.env.DB.prepare('SELECT count(*) count FROM page_media WHERE media_id=?').bind(id),
+      c.env.DB.prepare('SELECT count(*) count FROM category_media WHERE media_id=?').bind(id),
+    ]);
+    if (
+      relations.some(
+        (result: D1Result<unknown>) => Number((result.results[0] as { count: number }).count) > 0,
+      )
+    )
+      return c.json(
+        apiError('MEDIA_IN_USE', 'Файл використовується матеріалами і не може бути видалений'),
+        409,
+      );
+    const timestamp = new Date().toISOString();
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM media WHERE id=?').bind(id),
+      c.env.DB.prepare(
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'media.hard_delete',
+        'media',
+        id,
+        '{}',
+        timestamp,
+      ),
+    ]);
+    const keys = [
+      media.original_key,
+      media.variant_480_key,
+      media.variant_960_key,
+      media.variant_1600_key,
+    ].filter((key): key is string => Boolean(key));
+    try {
+      await Promise.all(keys.map((key) => c.env.MEDIA.delete(key)));
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          requestId: c.get('requestId'),
+          event: 'media.orphan_cleanup_failed',
+          id,
+          error: String(error),
+        }),
+      );
+      return c.json(
+        apiError('ORPHAN_CLEANUP_FAILED', 'Metadata видалено, але cleanup R2 потребує перевірки'),
+        500,
+      );
+    }
+    return c.json(apiSuccess({ id, status: 'deleted' }));
   });
   app.post('/api/admin/media', async (c) => {
+    const contentLength = Number(c.req.header('Content-Length') ?? 0);
+    if (contentLength > 21 * 1024 * 1024)
+      return c.json(apiError('PAYLOAD_TOO_LARGE', 'Upload не може перевищувати 20 MB'), 413);
     const form = await c.req.formData();
     const altUk = form.get('altUk');
     const variants = [form.get('variant480'), form.get('variant960'), form.get('variant1600')];
@@ -364,13 +519,33 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
         apiError('VALIDATION_ERROR', 'Потрібні alt українською та три WebP variants'),
         422,
       );
+    const declaredTotal = variants.reduce(
+      (sum, value) => sum + (value instanceof File ? value.size : 0),
+      0,
+    );
+    if (
+      declaredTotal > 20 * 1024 * 1024 ||
+      variants.some((value) => value instanceof File && value.size > 20 * 1024 * 1024)
+    )
+      return c.json(
+        apiError('PAYLOAD_TOO_LARGE', 'Загальний розмір variants не може перевищувати 20 MB'),
+        413,
+      );
     const files = await Promise.all(
       variants.map(async (file) => ({ file, bytes: new Uint8Array(await file.arrayBuffer()) })),
     );
     const inspected = files.map(({ bytes }) => inspectImage(bytes));
+    const allowedWidths = [480, 960, 1600];
     if (
       inspected.some(
-        (image) => !image || image.mimeType !== 'image/webp' || image.width < 1 || image.height < 1,
+        (image, index) =>
+          !image ||
+          image.mimeType !== 'image/webp' ||
+          image.width < 1 ||
+          image.height < 1 ||
+          image.width > allowedWidths[index]! ||
+          image.width * image.height > 20_000_000 ||
+          Math.max(image.width / image.height, image.height / image.width) > 20,
       )
     )
       return c.json(
@@ -448,13 +623,16 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
         ? media?.variant_480_key
         : variant === '960'
           ? media?.variant_960_key
-          : media?.variant_1600_key;
+          : variant === '1600'
+            ? media?.variant_1600_key
+            : null;
     if (!key || !media) return c.notFound();
     const object = await c.env.MEDIA.get(key);
     if (!object) return c.notFound();
     return new Response(object.body, {
       headers: {
         'Content-Type': media.mime_type,
+        ...(object.size ? { 'Content-Length': String(object.size) } : {}),
         'Cache-Control': 'public, max-age=31536000, immutable',
         ETag: object.httpEtag,
       },
@@ -486,6 +664,7 @@ export function registerPublicRoutes(app: import('hono').Hono<AppEnv>) {
     const hasEnglish = Number(page.is_en_published) === 1;
     return c.html(
       <Layout
+        nonce={c.get('cspNonce')}
         lang={locale}
         title={title}
         canonical={locale === 'en' ? enHref : ukHref}

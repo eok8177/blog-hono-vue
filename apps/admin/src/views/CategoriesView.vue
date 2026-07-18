@@ -33,9 +33,9 @@ const form = reactive({
 });
 const categories = useQuery({
   queryKey: ['categories'],
-  queryFn: () => api<Category[]>('/categories'),
+  queryFn: () => api<{ items: Category[]; total: number }>('/categories'),
 });
-const items = computed(() => categories.data.value ?? []);
+const items = computed(() => categories.data.value?.items ?? []);
 const isLoading = computed(() => categories.isPending.value);
 function reset() {
   selectedId.value = undefined;
@@ -86,13 +86,15 @@ const save = useMutation({
   },
 });
 const isSaving = computed(() => save.isPending.value);
-async function archive(item: Category) {
-  if (!confirm(`Архівувати «${item.title_uk}»?`)) return;
+async function remove(item: Category) {
+  if (!confirm(`Повністю видалити категорію «${item.title_uk}»? Цю дію неможливо скасувати.`))
+    return;
   try {
     await api(`/categories/${item.id}`, { method: 'DELETE' });
     await client.invalidateQueries({ queryKey: ['categories'] });
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не вдалося архівувати категорію.';
+    error.value =
+      cause instanceof ApiError ? cause.message : 'Не вдалося повністю видалити категорію.';
   }
 }
 </script>
@@ -121,7 +123,6 @@ async function archive(item: Category) {
         <select v-model="form.status">
           <option>draft</option>
           <option>published</option>
-          <option>archived</option>
         </select></label
       ><label><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label
       ><button :disabled="isSaving">{{ isSaving ? 'Збереження…' : 'Зберегти' }}</button
@@ -152,7 +153,7 @@ async function archive(item: Category) {
           <td>{{ item.status }}</td>
           <td>
             <button @click="edit(item)">Редагувати</button>
-            <button @click="archive(item)">Архівувати</button>
+            <button @click="remove(item)">Видалити назавжди</button>
           </td>
         </tr>
       </tbody>

@@ -25,3 +25,12 @@ pnpm dev
 ## Архітектура
 
 Public HTML рендериться Hono JSX без Vue. `/admin/` — окрема Vue SPA; `/api/admin/*` має Cloudflare Access JWT middleware і D1 role check. Bindings та production IDs налаштовуються лише у `wrangler.jsonc`/Cloudflare, без secrets у Git. Докладніше: `docs/architecture.md`, `docs/deployment.md`.
+
+## Safety and verification
+
+- `worker-configuration.d.ts` генерується командою `pnpm exec wrangler types`; CI перевіряє його через `pnpm types:check`.
+- Production deployment запускається лише через `pnpm deploy:production`, який вимагає HTTPS `SITE_URL`, Access domain/audience та відсутність `DEV_AUTH_BYPASS`.
+- Адмін HTML додатково перевіряє Access JWT/роль у Worker; API має `no-store`, public HTML має edge-cache TTL до 5 хвилин.
+- Upload приймає лише WebP variants із перевіркою magic bytes, розміру, dimensions, aspect ratio та pixel limit. Невідомий media variant повертає 404.
+- E2E тести ізольовані в `e2e/` через `playwright.config.ts`; перед локальним запуском один раз виконайте `pnpm exec playwright install chromium`.
+- Повний локальний набір: `pnpm verify`, `pnpm db:migrate:local`, `pnpm db:seed:local`, `pnpm test:e2e`.

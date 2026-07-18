@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run",
+    "build": "wrangler deploy --dry-run --env=\"\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts"
   },

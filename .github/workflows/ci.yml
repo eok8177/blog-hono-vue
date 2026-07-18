@@ -10,5 +10,9 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 26, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm types:check
       - run: pnpm verify
       - run: pnpm db:migrate:local
+      - run: pnpm db:seed:local
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e

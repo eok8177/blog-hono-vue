@@ -18,6 +18,23 @@ const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.header('Cache-Control', 'no-store');
   await next();
 };
+async function categoryCreatesCycle(
+  db: D1Database,
+  id: string | undefined,
+  parentId: string | null,
+) {
+  if (!parentId) return false;
+  if (id && id === parentId) return true;
+  const result = await db
+    .prepare(
+      `WITH RECURSIVE ancestors(id) AS (
+        SELECT ? UNION ALL SELECT c.parent_id FROM categories c JOIN ancestors a ON c.id=a.id WHERE c.parent_id IS NOT NULL
+      ) SELECT 1 FROM ancestors WHERE id=? LIMIT 1`,
+    )
+    .bind(parentId, id ?? '')
+    .first();
+  return Boolean(result);
+}
 
 export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   app.use('/api/admin/*', noStore, requireActor);
@@ -66,6 +83,7 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
     const locale = c.req.query('locale') === 'en' && post.title_en && post.body_md_en ? 'en' : 'uk';
     return c.html(
       <Layout
+        nonce={c.get('cspNonce')}
         lang={locale}
         title={`Preview: ${String(post[locale === 'en' ? 'title_en' : 'title_uk'])}`}
         robots="noindex,nofollow"
@@ -85,13 +103,24 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       .bind(c.req.param('id'))
       .first<Record<string, unknown>>();
     if (!row) return c.json(apiError('NOT_FOUND', 'Матеріал не знайдено'), 404);
-    const relations = await c.env.DB.prepare(
-      'SELECT media_id FROM post_media WHERE post_id=? ORDER BY position',
-    )
-      .bind(c.req.param('id'))
-      .all<{ media_id: string }>();
+    const relations = await c.env.DB.batch([
+      c.env.DB.prepare('SELECT media_id FROM post_media WHERE post_id=? ORDER BY position').bind(
+        c.req.param('id'),
+      ),
+      c.env.DB.prepare('SELECT category_id FROM post_categories WHERE post_id=?').bind(
+        c.req.param('id'),
+      ),
+    ]);
     return c.json(
-      apiSuccess({ ...row, mediaIds: relations.results.map((relation) => relation.media_id) }),
+      apiSuccess({
+        ...row,
+        mediaIds: (relations[0]!.results as Array<{ media_id: string }>).map(
+          (relation) => relation.media_id,
+        ),
+        categoryIds: (relations[1]!.results as Array<{ category_id: string }>).map(
+          (relation) => relation.category_id,
+        ),
+      }),
     );
   });
   app.post('/api/admin/posts', async (c) =>
@@ -100,50 +129,48 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   app.put('/api/admin/posts/:id', async (c) => {
     const saved = await savePost(c.env, c.get('actor'), c.req.param('id'), await c.req.json());
     if (saved.kind === 'missing') return c.json(apiError('NOT_FOUND', 'Матеріал не знайдено'), 404);
+    if (saved.kind === 'invalid')
+      return c.json(apiError('VALIDATION_ERROR', 'Для оновлення потрібна актуальна version'), 422);
     if (saved.kind === 'conflict')
       return c.json(apiError('CONFLICT', 'Матеріал змінив інший редактор'), 409);
     return c.json(apiSuccess(saved));
   });
   app.delete('/api/admin/posts/:id', async (c) => {
-    const t = new Date().toISOString();
-    const result = await c.env.DB.prepare(
-      "UPDATE posts SET status='archived',updated_at=? WHERE id=? AND status<>'archived'",
-    )
-      .bind(t, c.req.param('id'))
-      .run();
-    if (result.meta.changes)
-      await c.env.DB.prepare(
+    if (c.get('actor').role !== 'admin')
+      return c.json(apiError('FORBIDDEN', 'Повне видалення доступне лише адміністратору'), 403);
+    const id = c.req.param('id');
+    const post = await c.env.DB.prepare('SELECT id,slug FROM posts WHERE id=?')
+      .bind(id)
+      .first<{ id: string; slug: string }>();
+    if (!post) return c.json(apiError('NOT_FOUND', 'Матеріал не знайдено'), 404);
+    const timestamp = new Date().toISOString();
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM post_categories WHERE post_id=?').bind(id),
+      c.env.DB.prepare('DELETE FROM post_media WHERE post_id=?').bind(id),
+      c.env.DB.prepare("DELETE FROM redirects WHERE entity_type='post' AND entity_id=?").bind(id),
+      c.env.DB.prepare('DELETE FROM posts WHERE id=?').bind(id),
+      c.env.DB.prepare(
         'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
-      )
-        .bind(
-          crypto.randomUUID(),
-          c.get('actor').id,
-          'post.archive',
-          'post',
-          c.req.param('id'),
-          '{}',
-          t,
-        )
-        .run();
-    return result.meta.changes
-      ? c.json(apiSuccess({ id: c.req.param('id'), status: 'archived' }))
-      : c.json(apiError('NOT_FOUND', 'Матеріал не знайдено або вже archived'), 404);
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'post.delete',
+        'post',
+        id,
+        JSON.stringify({ slug: post.slug }),
+        timestamp,
+      ),
+    ]);
+    return c.json(apiSuccess({ id, status: 'deleted' }));
   });
   app.post('/api/admin/posts/:id/:action', async (c) => {
     const action = c.req.param('action');
-    if (action !== 'publish' && action !== 'archive')
-      return c.json(apiError('NOT_FOUND', 'Невідома дія'), 404);
+    if (action !== 'publish') return c.json(apiError('NOT_FOUND', 'Невідома дія'), 404);
     const timestamp = new Date().toISOString();
     const result = await c.env.DB.prepare(
-      "UPDATE posts SET status=?,published_at=CASE WHEN ?='published' THEN coalesce(published_at,?) ELSE published_at END,updated_at=? WHERE id=?",
+      "UPDATE posts SET status='published',published_at=coalesce(published_at,?),updated_at=? WHERE id=?",
     )
-      .bind(
-        action === 'publish' ? 'published' : 'archived',
-        action === 'publish' ? 'published' : 'archived',
-        timestamp,
-        timestamp,
-        c.req.param('id'),
-      )
+      .bind(timestamp, timestamp, c.req.param('id'))
       .run();
     if (!result.meta.changes) return c.json(apiError('NOT_FOUND', 'Матеріал не знайдено'), 404);
     await c.env.DB.prepare(
@@ -159,43 +186,67 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
         timestamp,
       )
       .run();
-    return c.json(apiSuccess({ status: action }));
+    return c.json(apiSuccess({ status: 'published' }));
   });
-  app.get('/api/admin/categories', async (c) =>
-    c.json(
-      apiSuccess(
-        (
-          await c.env.DB.prepare(
-            'SELECT * FROM categories ORDER BY updated_at DESC LIMIT 100',
-          ).all()
-        ).results,
-      ),
-    ),
-  );
-  app.delete('/api/admin/categories/:id', async (c) => {
-    const dependencies = await c.env.DB.batch([
+  app.get('/api/admin/categories', async (c) => {
+    const p = paginationSchema.parse(c.req.query());
+    const search = (c.req.query('q') ?? '').slice(0, 100);
+    const where = search ? 'WHERE title_uk LIKE ? OR title_en LIKE ?' : '';
+    const args = search ? [`%${search}%`, `%${search}%`] : [];
+    const results = await c.env.DB.batch([
       c.env.DB.prepare(
-        'SELECT count(*) count FROM posts p JOIN post_categories pc ON pc.post_id=p.id WHERE pc.category_id=?',
-      ).bind(c.req.param('id')),
-      c.env.DB.prepare('SELECT count(*) count FROM categories WHERE parent_id=?').bind(
-        c.req.param('id'),
-      ),
+        `SELECT * FROM categories ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+      ).bind(...args, p.pageSize, (p.page - 1) * p.pageSize),
+      c.env.DB.prepare(`SELECT count(*) count FROM categories ${where}`).bind(...args),
     ]);
-    const posts = (dependencies[0]!.results[0] as { count: number }).count;
-    const children = (dependencies[1]!.results[0] as { count: number }).count;
+    return c.json(
+      apiSuccess({
+        items: results[0]!.results,
+        total: Number((results[1]!.results[0] as { count: number }).count),
+        page: p.page,
+        pageSize: p.pageSize,
+      }),
+    );
+  });
+  app.delete('/api/admin/categories/:id', async (c) => {
+    if (c.get('actor').role !== 'admin')
+      return c.json(apiError('FORBIDDEN', 'Повне видалення доступне лише адміністратору'), 403);
+    const id = c.req.param('id');
+    const category = await c.env.DB.prepare('SELECT id,slug FROM categories WHERE id=?')
+      .bind(id)
+      .first<{ id: string; slug: string }>();
+    if (!category) return c.json(apiError('NOT_FOUND', 'Категорію не знайдено'), 404);
+    const dependencies = await c.env.DB.batch([
+      c.env.DB.prepare('SELECT count(*) count FROM post_categories WHERE category_id=?').bind(id),
+      c.env.DB.prepare('SELECT count(*) count FROM categories WHERE parent_id=?').bind(id),
+    ]);
+    const posts = Number((dependencies[0]!.results[0] as { count: number }).count);
+    const children = Number((dependencies[1]!.results[0] as { count: number }).count);
     if (posts || children)
       return c.json(
         apiError('CATEGORY_IN_USE', 'Спершу перепризначте пости та дочірні категорії'),
         409,
       );
-    const result = await c.env.DB.prepare(
-      "UPDATE categories SET status='archived',updated_at=? WHERE id=?",
-    )
-      .bind(new Date().toISOString(), c.req.param('id'))
-      .run();
-    return result.meta.changes
-      ? c.json(apiSuccess({ id: c.req.param('id'), status: 'archived' }))
-      : c.json(apiError('NOT_FOUND', 'Категорію не знайдено'), 404);
+    const timestamp = new Date().toISOString();
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM category_media WHERE category_id=?').bind(id),
+      c.env.DB.prepare("DELETE FROM redirects WHERE entity_type='category' AND entity_id=?").bind(
+        id,
+      ),
+      c.env.DB.prepare('DELETE FROM categories WHERE id=?').bind(id),
+      c.env.DB.prepare(
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'category.delete',
+        'category',
+        id,
+        JSON.stringify({ slug: category.slug }),
+        timestamp,
+      ),
+    ]);
+    return c.json(apiSuccess({ id, status: 'deleted' }));
   });
   app.get('/api/admin/categories/:id', async (c) => {
     const row = await c.env.DB.prepare('SELECT * FROM categories WHERE id=?')
@@ -207,6 +258,8 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   });
   app.post('/api/admin/categories', async (c) => {
     const d = categoryInputSchema.parse(await c.req.json());
+    if (await categoryCreatesCycle(c.env.DB, undefined, d.parentId ?? null))
+      return c.json(apiError('CATEGORY_CYCLE', 'Ієрархія категорій містить цикл'), 422);
     const collision = await c.env.DB.prepare('SELECT id FROM categories WHERE slug=?')
       .bind(d.slug)
       .first();
@@ -237,6 +290,15 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   });
   app.put('/api/admin/categories/:id', async (c) => {
     const d = categoryInputSchema.parse(await c.req.json());
+    const categoryId = c.req.param('id');
+    if (!d.version)
+      return c.json(apiError('VALIDATION_ERROR', 'Для оновлення потрібна version'), 422);
+    if (await categoryCreatesCycle(c.env.DB, categoryId, d.parentId ?? null))
+      return c.json(apiError('CATEGORY_CYCLE', 'Ієрархія категорій містить цикл'), 422);
+    const old = await c.env.DB.prepare('SELECT slug FROM categories WHERE id=?')
+      .bind(categoryId)
+      .first<{ slug: string }>();
+    if (!old) return c.json(apiError('NOT_FOUND', 'Категорію не знайдено'), 404);
     const t = new Date().toISOString();
     const result = await c.env.DB.prepare(
       'UPDATE categories SET parent_id=?,slug=?,title_uk=?,title_en=?,description_md_uk=?,description_md_en=?,status=?,is_en_published=?,show_in_menu=?,menu_order=?,updated_at=? WHERE id=? AND updated_at=?',
@@ -259,25 +321,101 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       .run();
     if (result.meta.changes === 0)
       return c.json(apiError('CONFLICT', 'Категорія змінилася або не існує'), 409);
-    return c.json(apiSuccess({ id: c.req.param('id') }));
-  });
-  app.get('/api/admin/pages', async (c) =>
-    c.json(
-      apiSuccess(
-        (await c.env.DB.prepare('SELECT * FROM pages ORDER BY updated_at DESC LIMIT 100').all())
-          .results,
+    const changes: D1PreparedStatement[] = [
+      c.env.DB.prepare(
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'category.update',
+        'category',
+        categoryId,
+        JSON.stringify({ slug: d.slug, status: d.status }),
+        t,
       ),
-    ),
-  );
+    ];
+    if (old.slug !== d.slug) {
+      changes.push(
+        c.env.DB.prepare(
+          "UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='category' AND entity_id=?",
+        ).bind(`/en/category/${d.slug}`, `/category/${d.slug}`, categoryId),
+        c.env.DB.prepare('DELETE FROM redirects WHERE old_path IN (?,?)').bind(
+          `/category/${d.slug}`,
+          `/en/category/${d.slug}`,
+        ),
+        c.env.DB.prepare(
+          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
+        ).bind(
+          crypto.randomUUID(),
+          `/category/${old.slug}`,
+          `/category/${d.slug}`,
+          301,
+          'category',
+          categoryId,
+          t,
+        ),
+        c.env.DB.prepare(
+          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
+        ).bind(
+          crypto.randomUUID(),
+          `/en/category/${old.slug}`,
+          `/en/category/${d.slug}`,
+          301,
+          'category',
+          categoryId,
+          t,
+        ),
+      );
+    }
+    await c.env.DB.batch(changes);
+    return c.json(apiSuccess({ id: categoryId, updatedAt: t }));
+  });
+  app.get('/api/admin/pages', async (c) => {
+    const p = paginationSchema.parse(c.req.query());
+    const search = (c.req.query('q') ?? '').slice(0, 100);
+    const where = search ? 'WHERE title_uk LIKE ? OR title_en LIKE ?' : '';
+    const args = search ? [`%${search}%`, `%${search}%`] : [];
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `SELECT * FROM pages ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+      ).bind(...args, p.pageSize, (p.page - 1) * p.pageSize),
+      c.env.DB.prepare(`SELECT count(*) count FROM pages ${where}`).bind(...args),
+    ]);
+    return c.json(
+      apiSuccess({
+        items: results[0]!.results,
+        total: Number((results[1]!.results[0] as { count: number }).count),
+        page: p.page,
+        pageSize: p.pageSize,
+      }),
+    );
+  });
   app.delete('/api/admin/pages/:id', async (c) => {
-    const result = await c.env.DB.prepare(
-      "UPDATE pages SET status='archived',updated_at=? WHERE id=? AND status<>'archived'",
-    )
-      .bind(new Date().toISOString(), c.req.param('id'))
-      .run();
-    return result.meta.changes
-      ? c.json(apiSuccess({ id: c.req.param('id'), status: 'archived' }))
-      : c.json(apiError('NOT_FOUND', 'Сторінку не знайдено або вже archived'), 404);
+    if (c.get('actor').role !== 'admin')
+      return c.json(apiError('FORBIDDEN', 'Повне видалення доступне лише адміністратору'), 403);
+    const id = c.req.param('id');
+    const page = await c.env.DB.prepare('SELECT id,slug FROM pages WHERE id=?')
+      .bind(id)
+      .first<{ id: string; slug: string }>();
+    if (!page) return c.json(apiError('NOT_FOUND', 'Сторінку не знайдено'), 404);
+    const timestamp = new Date().toISOString();
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM page_media WHERE page_id=?').bind(id),
+      c.env.DB.prepare("DELETE FROM redirects WHERE entity_type='page' AND entity_id=?").bind(id),
+      c.env.DB.prepare('DELETE FROM pages WHERE id=?').bind(id),
+      c.env.DB.prepare(
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'page.delete',
+        'page',
+        id,
+        JSON.stringify({ slug: page.slug }),
+        timestamp,
+      ),
+    ]);
+    return c.json(apiSuccess({ id, status: 'deleted' }));
   });
   app.get('/api/admin/pages/:id/preview', async (c) => {
     const page = await c.env.DB.prepare('SELECT * FROM pages WHERE id=?')
@@ -287,6 +425,7 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
     const locale = c.req.query('locale') === 'en' && page.title_en && page.body_md_en ? 'en' : 'uk';
     return c.html(
       <Layout
+        nonce={c.get('cspNonce')}
         lang={locale}
         title={`Preview: ${String(page[locale === 'en' ? 'title_en' : 'title_uk'])}`}
         robots="noindex,nofollow"
@@ -300,6 +439,31 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
         </article>
       </Layout>,
     );
+  });
+  app.post('/api/admin/pages/:id/:action', async (c) => {
+    const action = c.req.param('action');
+    if (action !== 'publish') return c.json(apiError('NOT_FOUND', 'Невідома дія'), 404);
+    const timestamp = new Date().toISOString();
+    const result = await c.env.DB.prepare(
+      "UPDATE pages SET status='published',published_at=COALESCE(published_at,?),updated_by=?,updated_at=? WHERE id=?",
+    )
+      .bind(timestamp, c.get('actor').id, timestamp, c.req.param('id'))
+      .run();
+    if (!result.meta.changes) return c.json(apiError('NOT_FOUND', 'Сторінку не знайдено'), 404);
+    await c.env.DB.prepare(
+      'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+    )
+      .bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        `page.${action}`,
+        'page',
+        c.req.param('id'),
+        '{}',
+        timestamp,
+      )
+      .run();
+    return c.json(apiSuccess({ id: c.req.param('id'), status: 'published' }));
   });
   app.get('/api/admin/pages/:id', async (c) => {
     const row = await c.env.DB.prepare('SELECT * FROM pages WHERE id=?')
@@ -348,6 +512,13 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   });
   app.put('/api/admin/pages/:id', async (c) => {
     const d = pageInputSchema.parse(await c.req.json());
+    if (!d.version)
+      return c.json(apiError('VALIDATION_ERROR', 'Для оновлення потрібна version'), 422);
+    const pageId = c.req.param('id');
+    const old = await c.env.DB.prepare('SELECT slug FROM pages WHERE id=?')
+      .bind(pageId)
+      .first<{ slug: string }>();
+    if (!old) return c.json(apiError('NOT_FOUND', 'Сторінку не знайдено'), 404);
     const t = new Date().toISOString();
     const result = await c.env.DB.prepare(
       'UPDATE pages SET slug=?,template=?,title_uk=?,title_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,show_in_menu=?,menu_order=?,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=? WHERE id=? AND updated_at=?',
@@ -375,7 +546,38 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       .run();
     if (result.meta.changes === 0)
       return c.json(apiError('CONFLICT', 'Сторінка змінилася або не існує'), 409);
-    return c.json(apiSuccess({ id: c.req.param('id') }));
+    const changes: D1PreparedStatement[] = [
+      c.env.DB.prepare(
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'page.update',
+        'page',
+        pageId,
+        JSON.stringify({ slug: d.slug, status: d.status }),
+        t,
+      ),
+    ];
+    if (old.slug !== d.slug) {
+      changes.push(
+        c.env.DB.prepare(
+          "UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='page' AND entity_id=?",
+        ).bind(`/en/${d.slug}`, `/${d.slug}`, pageId),
+        c.env.DB.prepare('DELETE FROM redirects WHERE old_path IN (?,?)').bind(
+          `/${d.slug}`,
+          `/en/${d.slug}`,
+        ),
+        c.env.DB.prepare(
+          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
+        ).bind(crypto.randomUUID(), `/${old.slug}`, `/${d.slug}`, 301, 'page', pageId, t),
+        c.env.DB.prepare(
+          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
+        ).bind(crypto.randomUUID(), `/en/${old.slug}`, `/en/${d.slug}`, 301, 'page', pageId, t),
+      );
+    }
+    await c.env.DB.batch(changes);
+    return c.json(apiSuccess({ id: pageId, updatedAt: t }));
   });
   app.use('/api/admin/users', requireAdmin);
   app.use('/api/admin/users/*', requireAdmin);
@@ -383,17 +585,23 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   app.use('/api/admin/redirects', requireAdmin);
   app.use('/api/admin/redirects/*', requireAdmin);
   app.use('/api/admin/audit-log', requireAdmin);
-  app.get('/api/admin/users', async (c) =>
-    c.json(
-      apiSuccess(
-        (
-          await c.env.DB.prepare(
-            'SELECT id,email,name,role,is_active,last_seen_at,created_at,updated_at FROM users ORDER BY created_at',
-          ).all()
-        ).results,
-      ),
-    ),
-  );
+  app.get('/api/admin/users', async (c) => {
+    const p = paginationSchema.parse(c.req.query());
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        'SELECT id,email,name,role,is_active,last_seen_at,created_at,updated_at FROM users ORDER BY created_at LIMIT ? OFFSET ?',
+      ).bind(p.pageSize, (p.page - 1) * p.pageSize),
+      c.env.DB.prepare('SELECT count(*) count FROM users'),
+    ]);
+    return c.json(
+      apiSuccess({
+        items: results[0]!.results,
+        total: Number((results[1]!.results[0] as { count: number }).count),
+        page: p.page,
+        pageSize: p.pageSize,
+      }),
+    );
+  });
   app.post('/api/admin/users', async (c) => {
     const d = userInputSchema.parse(await c.req.json());
     const id = crypto.randomUUID();
@@ -484,27 +692,62 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       .run();
     return c.json(apiSuccess({ key: d.key }));
   });
-  app.get('/api/admin/redirects', async (c) =>
-    c.json(
-      apiSuccess(
-        (await c.env.DB.prepare('SELECT * FROM redirects ORDER BY created_at DESC LIMIT 200').all())
-          .results,
+  app.get('/api/admin/redirects', async (c) => {
+    const p = paginationSchema.parse(c.req.query());
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare('SELECT * FROM redirects ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(
+        p.pageSize,
+        (p.page - 1) * p.pageSize,
       ),
-    ),
-  );
-  app.delete('/api/admin/redirects/:id', async (c) => {
-    await c.env.DB.prepare('DELETE FROM redirects WHERE id=?').bind(c.req.param('id')).run();
-    return c.json(apiSuccess({ id: c.req.param('id') }));
+      c.env.DB.prepare('SELECT count(*) count FROM redirects'),
+    ]);
+    return c.json(
+      apiSuccess({
+        items: results[0]!.results,
+        total: Number((results[1]!.results[0] as { count: number }).count),
+        page: p.page,
+        pageSize: p.pageSize,
+      }),
+    );
   });
-  app.get('/api/admin/audit-log', async (c) =>
-    c.json(
-      apiSuccess(
-        (
-          await c.env.DB.prepare(
-            'SELECT audit_logs.id,audit_logs.action,audit_logs.entity_type,audit_logs.entity_id,audit_logs.metadata_json,audit_logs.created_at,users.email actor_email FROM audit_logs LEFT JOIN users ON users.id=audit_logs.actor_user_id ORDER BY audit_logs.created_at DESC LIMIT 200',
-          ).all()
-        ).results,
+  app.delete('/api/admin/redirects/:id', async (c) => {
+    const id = c.req.param('id');
+    const timestamp = new Date().toISOString();
+    const redirect = await c.env.DB.prepare('SELECT old_path,new_path FROM redirects WHERE id=?')
+      .bind(id)
+      .first<{ old_path: string; new_path: string }>();
+    if (!redirect) return c.json(apiError('NOT_FOUND', 'Redirect не знайдено'), 404);
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM redirects WHERE id=?').bind(id),
+      c.env.DB.prepare(
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'redirect.delete',
+        'redirect',
+        id,
+        JSON.stringify({ oldPath: redirect.old_path, newPath: redirect.new_path }),
+        timestamp,
       ),
-    ),
-  );
+    ]);
+    return c.json(apiSuccess({ id }));
+  });
+  app.get('/api/admin/audit-log', async (c) => {
+    const p = paginationSchema.parse(c.req.query());
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        'SELECT audit_logs.id,audit_logs.action,audit_logs.entity_type,audit_logs.entity_id,audit_logs.metadata_json,audit_logs.created_at,users.email actor_email FROM audit_logs LEFT JOIN users ON users.id=audit_logs.actor_user_id ORDER BY audit_logs.created_at DESC LIMIT ? OFFSET ?',
+      ).bind(p.pageSize, (p.page - 1) * p.pageSize),
+      c.env.DB.prepare('SELECT count(*) count FROM audit_logs'),
+    ]);
+    return c.json(
+      apiSuccess({
+        items: results[0]!.results,
+        total: Number((results[1]!.results[0] as { count: number }).count),
+        page: p.page,
+        pageSize: p.pageSize,
+      }),
+    );
+  });
 }

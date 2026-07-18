@@ -30,6 +30,10 @@ export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
+const optionalVersionSchema = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().datetime().optional(),
+);
 export const postInputSchema = z
   .object({
     slug: slugSchema,
@@ -45,7 +49,7 @@ export const postInputSchema = z
     seoTitleEn: z.string().max(250).nullable().optional(),
     seoDescriptionUk: z.string().max(320).nullable().optional(),
     seoDescriptionEn: z.string().max(320).nullable().optional(),
-    version: z.string().datetime().optional(),
+    version: optionalVersionSchema,
     categoryIds: z.array(z.string().uuid()).max(20).default([]),
     mediaIds: z.array(z.string().uuid()).max(50).default([]),
   })
@@ -67,7 +71,7 @@ const translatedPublication = z
     bodyMdEn: z.string().nullable().optional(),
     status: z.enum(statuses).default('draft'),
     isEnPublished: z.boolean().default(false),
-    version: z.string().datetime().optional(),
+    version: optionalVersionSchema,
   })
   .superRefine((data, ctx) => {
     if (data.isEnPublished && (!data.titleEn || !data.bodyMdEn))
@@ -86,19 +90,28 @@ export const pageInputSchema = translatedPublication.extend({
   seoDescriptionUk: z.string().max(320).nullable().optional(),
   seoDescriptionEn: z.string().max(320).nullable().optional(),
 });
-export const categoryInputSchema = z.object({
-  slug: slugSchema,
-  parentId: z.string().uuid().nullable().optional(),
-  titleUk: z.string().trim().min(1).max(250),
-  titleEn: z.string().trim().max(250).nullable().optional(),
-  descriptionMdUk: z.string().nullable().optional(),
-  descriptionMdEn: z.string().nullable().optional(),
-  status: z.enum(statuses).default('draft'),
-  isEnPublished: z.boolean().default(false),
-  showInMenu: z.boolean().default(false),
-  menuOrder: z.number().int().min(0).max(10000).default(0),
-  version: z.string().datetime().optional(),
-});
+export const categoryInputSchema = z
+  .object({
+    slug: slugSchema,
+    parentId: z.string().uuid().nullable().optional(),
+    titleUk: z.string().trim().min(1).max(250),
+    titleEn: z.string().trim().max(250).nullable().optional(),
+    descriptionMdUk: z.string().nullable().optional(),
+    descriptionMdEn: z.string().nullable().optional(),
+    status: z.enum(statuses).default('draft'),
+    isEnPublished: z.boolean().default(false),
+    showInMenu: z.boolean().default(false),
+    menuOrder: z.number().int().min(0).max(10000).default(0),
+    version: optionalVersionSchema,
+  })
+  .superRefine((data, ctx) => {
+    if (data.isEnPublished && !data.titleEn)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Для англійської публікації потрібна English назва',
+        path: ['isEnPublished'],
+      });
+  });
 export const mediaUpdateSchema = z.object({
   altUk: z.string().trim().min(1).max(500),
   altEn: z.string().trim().max(500).nullable().optional(),
@@ -115,10 +128,27 @@ export const userInputSchema = z.object({
   role: z.enum(roles),
   isActive: z.boolean().default(true),
 });
-export const settingInputSchema = z.object({
-  key: z.enum(['site', 'home']),
-  value: z.record(z.string(), z.unknown()),
-});
+const siteSettingsSchema = z
+  .object({
+    titleUk: z.string().trim().max(250).optional(),
+    titleEn: z.string().trim().max(250).optional(),
+    descriptionUk: z.string().max(320).optional(),
+    descriptionEn: z.string().max(320).optional(),
+  })
+  .strict();
+const homeSettingsSchema = z
+  .object({
+    heroTitleUk: z.string().trim().max(250).optional(),
+    heroTitleEn: z.string().trim().max(250).optional(),
+    introUk: z.string().max(5000).optional(),
+    introEn: z.string().max(5000).optional(),
+    featuredPostIds: z.array(z.string().uuid()).max(50).optional(),
+  })
+  .strict();
+export const settingInputSchema = z.discriminatedUnion('key', [
+  z.object({ key: z.literal('site'), value: siteSettingsSchema }),
+  z.object({ key: z.literal('home'), value: homeSettingsSchema }),
+]);
 export const apiError = (code: string, message: string, fields?: Record<string, string>) => ({
   ok: false as const,
   error: { code, message, ...(fields ? { fields } : {}) },

@@ -10,6 +10,10 @@ const localAccessBypass = ['localhost', '127.0.0.1', '[::1]'].includes(window.lo
         <RouterLink to="/">Огляд</RouterLink><RouterLink to="/posts">Публікації</RouterLink
         ><RouterLink to="/categories">Категорії</RouterLink
         ><RouterLink to="/pages">Сторінки</RouterLink><RouterLink to="/media">Медіа</RouterLink
+        ><RouterLink to="/users">Користувачі</RouterLink
+        ><RouterLink to="/settings">Налаштування</RouterLink
+        ><RouterLink to="/redirects">Redirects</RouterLink
+        ><RouterLink to="/audit-log">Журнал</RouterLink
         ><span v-if="localAccessBypass" title="Cloudflare Access logout доступний після deployment"
           >Local development</span
         ><a v-else href="/cdn-cgi/access/logout">Вийти</a>

@@ -4,7 +4,7 @@
 2. Replace placeholder database IDs, bucket names and `SITE_URL` in environment config; run `pnpm exec wrangler types`.
 3. Create Access application covering `/admin`, `/admin/*`, `/api/admin`, `/api/admin/*`; configure email/IdP policy and copy team domain/audience to non-secret vars.
 4. Set `TURNSTILE_SECRET_KEY` only with `pnpm exec wrangler secret put`; never commit it. Set `DEV_AUTH_BYPASS` nowhere outside local `.dev.vars`.
-5. Build, dry-run, migrate then deploy: `pnpm build`; `pnpm exec wrangler d1 migrations apply <db> --env production --remote`; `pnpm exec wrangler deploy --env production --dry-run`; `pnpm exec wrangler deploy --env production`.
+5. Build, dry-run, migrate then deploy: `pnpm build`; `pnpm exec wrangler d1 migrations apply <db> --env production --remote`; `pnpm exec wrangler deploy --env production --dry-run`; `pnpm deploy:production` (the script validates production configuration first).
 6. Verify Access, a public SSR page, `robots.txt`, sitemap, media headers and admin `Cache-Control: no-store`.
 
 ## Cost and monitoring
