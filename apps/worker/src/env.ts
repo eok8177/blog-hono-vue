@@ -3,6 +3,8 @@ export type Bindings = Env & {
   DB: D1Database;
   MEDIA: R2Bucket;
   TURNSTILE_SECRET_KEY?: string;
+  DEV_AUTH_BYPASS?: string;
+  DEV_AUTH_EMAIL?: string;
 };
 export interface Actor {
   id: string;

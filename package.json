@@ -3,12 +3,20 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.15.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "vue-demi",
+      "workerd"
+    ]
+  },
   "scripts": {
     "dev": "pnpm --filter @fauna/admin build && concurrently -k -n admin,worker -c cyan,green \"pnpm --filter @fauna/admin build --watch\" \"pnpm --filter @fauna/worker dev\"",
     "build": "pnpm validate:config && pnpm --filter @fauna/admin build && pnpm --filter @fauna/worker build",
     "validate:config": "node scripts/validate-config.mjs",
     "validate:production": "node scripts/validate-config.mjs --production",
-    "types:check": "pnpm exec wrangler types --check",
+    "types:check": "node scripts/check-types.mjs",
     "deploy:production": "pnpm validate:production && pnpm exec wrangler deploy --env production",
     "lint": "eslint .",
     "format": "prettier --write .",
