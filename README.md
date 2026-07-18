@@ -22,6 +22,11 @@ pnpm dev
 
 `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm verify`.
 
+## Деплой на прод
+```sh
+pnpm wrangler deploy --env production
+```
+
 ## Архітектура
 
 Public HTML рендериться Hono JSX без Vue. `/admin/` — окрема Vue SPA; `/api/admin/*` має Cloudflare Access JWT middleware і D1 role check. Bindings та production IDs налаштовуються лише у `wrangler.jsonc`/Cloudflare, без secrets у Git. Докладніше: `docs/architecture.md`, `docs/deployment.md`.
