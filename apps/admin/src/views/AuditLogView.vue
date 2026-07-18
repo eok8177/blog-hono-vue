@@ -17,25 +17,37 @@ const items = computed(() => events.data.value?.items ?? []);
 </script>
 <template>
   <section>
-    <h1>Журнал дій</h1>
-    <p v-if="events.isPending.value">Завантаження…</p>
-    <table v-else>
-      <thead>
-        <tr>
-          <th>Час</th>
-          <th>Дія</th>
-          <th>Сутність</th>
-          <th>Актор</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="item in items" :key="item.id">
-          <td>{{ item.created_at }}</td>
-          <td>{{ item.action }}</td>
-          <td>{{ item.entity_type }}</td>
-          <td>{{ item.actor_email ?? '—' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="admin-page-heading">
+      <div>
+        <p class="admin-eyebrow">Безпека</p>
+        <h1>Журнал дій</h1>
+        <p>Історія критичних змін у контенті та налаштуваннях.</p>
+      </div>
+    </div>
+    <p v-if="events.isPending.value" class="admin-state">Завантаження…</p>
+    <p v-else-if="events.isError.value" class="admin-state" role="alert">
+      Не вдалося завантажити журнал.
+    </p>
+    <p v-else-if="!items.length" class="admin-state admin-list-card">Подій ще немає.</p>
+    <div v-else class="admin-list-card admin-table-scroll">
+      <table class="admin-data-table">
+        <thead>
+          <tr>
+            <th>Час</th>
+            <th>Дія</th>
+            <th>Сутність</th>
+            <th>Актор</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in items" :key="item.id">
+            <td>{{ item.created_at }}</td>
+            <td>{{ item.action }}</td>
+            <td>{{ item.entity_type }}</td>
+            <td>{{ item.actor_email ?? '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 </template>

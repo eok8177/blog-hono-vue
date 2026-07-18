@@ -24,7 +24,6 @@ const selectedId = ref<string>();
 const client = useQueryClient();
 const media = useQuery({ queryKey: ['media'], queryFn: () => api<{ items: Media[] }>('/media') });
 const items = computed(() => media.data.value?.items ?? []);
-const isLoading = computed(() => media.isPending.value);
 const form = reactive({
   altUk: '',
   altEn: '',
@@ -50,7 +49,6 @@ const upload = useMutation({
     message.value = e instanceof Error ? e.message : 'Upload не вдався.';
   },
 });
-const isUploading = computed(() => upload.isPending.value);
 function selected(event: Event) {
   file.value = (event.target as HTMLInputElement).files?.[0];
 }
@@ -95,45 +93,81 @@ async function remove(item: Media) {
 </script>
 <template>
   <section>
-    <h1>Медіатека</h1>
-    <form @submit.prevent="upload.mutate()">
-      <label
-        >Зображення
-        <input
+    <div class="admin-page-heading">
+      <div>
+        <p class="admin-eyebrow">Файли та зображення</p>
+        <h1>Медіатека</h1>
+        <p>Завантажуйте WebP variants та керуйте описами зображень.</p>
+      </div>
+    </div>
+    <form class="admin-upload-card" @submit.prevent="upload.mutate()">
+      <div class="admin-upload-icon">↑</div>
+      <div>
+        <h2>Додати зображення</h2>
+        <p>JPEG, PNG або WebP. Варіанти створюються автоматично.</p>
+      </div>
+      <label class="admin-file-input"
+        >Вибрати файл<input
           type="file"
           accept="image/jpeg,image/png,image/webp"
           required
           @change="selected" /></label
-      ><label>Alt українською <input v-model="altUk" required /></label
-      ><button :disabled="isUploading">
-        {{ isUploading ? 'Підготовка й upload…' : 'Завантажити' }}
+      ><label class="admin-upload-alt"
+        >Alt українською<input v-model="altUk" required placeholder="Опишіть зображення" /></label
+      ><button :disabled="upload.isPending.value">
+        {{ upload.isPending.value ? 'Підготовка…' : 'Завантажити' }}
       </button>
     </form>
-    <p aria-live="polite">{{ message }}</p>
-    <form v-if="selectedId" @submit.prevent="save.mutate()">
-      <h2>Редагування metadata</h2>
-      <label>Alt українською <input v-model="form.altUk" required /></label
-      ><label>Alt English <input v-model="form.altEn" /></label
-      ><label>Caption <input v-model="form.captionUk" /></label
-      ><label>Credit <input v-model="form.credit" /></label
-      ><label>License <input v-model="form.license" /></label
-      ><label>Source URL <input v-model="form.sourceUrl" type="url" /></label
-      ><button>Зберегти metadata</button
-      ><button type="button" @click="selectedId = undefined">Скасувати</button>
+    <p v-if="message" role="status" aria-live="polite">{{ message }}</p>
+    <form v-if="selectedId" class="admin-editor-form" @submit.prevent="save.mutate()">
+      <div class="admin-form-heading">
+        <div>
+          <p class="admin-eyebrow">Metadata</p>
+          <h2>Редагування зображення</h2>
+        </div>
+        <button type="button" class="admin-close-button" @click="selectedId = undefined">×</button>
+      </div>
+      <div class="admin-form-grid">
+        <label>Alt українською <input v-model="form.altUk" required /></label
+        ><label>Alt English <input v-model="form.altEn" /></label
+        ><label>Credit <input v-model="form.credit" /></label
+        ><label>License <input v-model="form.license" /></label
+        ><label>Caption <input v-model="form.captionUk" /></label
+        ><label>Source URL <input v-model="form.sourceUrl" type="url" /></label>
+      </div>
+      <div class="admin-form-actions">
+        <button :disabled="save.isPending.value">
+          {{ save.isPending.value ? 'Збереження…' : 'Зберегти metadata' }}</button
+        ><button type="button" class="admin-secondary-button" @click="selectedId = undefined">
+          Скасувати
+        </button>
+      </div>
     </form>
-    <p v-if="isLoading">Завантаження…</p>
-    <div v-else class="grid">
-      <article v-for="item in items" :key="item.id">
-        <img
-          :src="`/media/${item.id}/480`"
-          :alt="item.alt_uk"
-          width="480"
-          height="320"
-          loading="lazy"
-        />
-        <p>{{ item.alt_uk }} · {{ item.width }}×{{ item.height }}</p>
-        <button @click="edit(item)">Редагувати</button>
-        <button @click="remove(item)">Видалити назавжди</button>
+    <p v-if="media.isPending.value" class="admin-state">Завантаження…</p>
+    <p v-else-if="media.isError.value" class="admin-state" role="alert">
+      Не вдалося завантажити медіатеку.
+    </p>
+    <p v-else-if="!items.length" class="admin-state admin-list-card">Медіафайлів ще немає.</p>
+    <div v-else class="admin-media-grid">
+      <article v-for="item in items" :key="item.id" class="admin-media-card">
+        <div class="admin-media-preview">
+          <img
+            :src="`/media/${item.id}/480`"
+            :alt="item.alt_uk"
+            width="480"
+            height="320"
+            loading="lazy"
+          />
+        </div>
+        <div class="admin-media-info">
+          <strong>{{ item.alt_uk }}</strong
+          ><span>{{ item.width }}×{{ item.height }} · {{ item.status }}</span>
+        </div>
+        <div class="admin-media-actions">
+          <button type="button" class="admin-secondary-button" @click="edit(item)">
+            Редагувати</button
+          ><button type="button" class="admin-danger-button" @click="remove(item)">Видалити</button>
+        </div>
       </article>
     </div>
   </section>

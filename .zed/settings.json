@@ -1,0 +1,24 @@
+{
+  "lsp": {
+    "vscode-css-language-server": {
+      "settings": {
+        "css": {
+          "lint": {
+            "unknownAtRules": "ignore"
+          }
+        },
+        "css.lint.unknownAtRules": "ignore"
+      }
+    },
+    "tailwindcss-language-server": {
+      "settings": {
+        "tailwindCSS": {
+          "lint": {
+            "suggestCanonicalClasses": "ignore"
+          }
+        },
+        "tailwindCSS.lint.suggestCanonicalClasses": "ignore"
+      }
+    }
+  }
+}

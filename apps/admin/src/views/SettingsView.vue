@@ -108,13 +108,19 @@ async function save(key: SettingKey) {
 </script>
 <template>
   <section>
-    <h1>Налаштування</h1>
+    <div class="admin-page-heading">
+      <div>
+        <p class="admin-eyebrow">Конфігурація</p>
+        <h1>Налаштування</h1>
+        <p>Керуйте назвою сайту та контентом головної сторінки.</p>
+      </div>
+    </div>
     <p v-if="isLoading">Завантаження…</p>
     <p v-else-if="settings.isError.value" role="alert">Не вдалося завантажити налаштування.</p>
     <template v-else>
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="message" role="status">{{ message }}</p>
-      <form @submit.prevent="save('site')">
+      <form class="admin-editor-form" @submit.prevent="save('site')">
         <h2>Сайт</h2>
         <label>Назва українською <input v-model="site.titleUk" maxlength="250" required /></label>
         <label>Назва English <input v-model="site.titleEn" maxlength="250" /></label>
@@ -128,7 +134,7 @@ async function save(key: SettingKey) {
           {{ saving === 'site' ? 'Збереження…' : 'Зберегти сайт' }}
         </button>
       </form>
-      <form @submit.prevent="save('home')">
+      <form class="admin-editor-form" @submit.prevent="save('home')">
         <h2>Головна сторінка</h2>
         <label
           >Hero заголовок українською <input v-model="home.heroTitleUk" maxlength="250"

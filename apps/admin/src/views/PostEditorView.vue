@@ -122,9 +122,16 @@ async function save() {
 </script>
 <template>
   <section>
-    <h1>{{ id ? 'Редагування' : 'Нова публікація' }}</h1>
-    <p v-if="loading">Завантаження…</p>
-    <form v-else @submit.prevent="save">
+    <div class="admin-page-heading">
+      <div>
+        <p class="admin-eyebrow">Контент / Публікація</p>
+        <h1>{{ id ? 'Редагування публікації' : 'Нова публікація' }}</h1>
+        <p>Заповніть українську версію, переклад, SEO та медіа.</p>
+      </div>
+      <RouterLink class="admin-secondary-button button" to="/posts">← До списку</RouterLink>
+    </div>
+    <p v-if="loading" class="admin-state">Завантаження…</p>
+    <form v-else class="admin-editor-form" @submit.prevent="save">
       <p v-if="error" role="alert">{{ error }}</p>
       <label>Slug <input v-model="form.slug" required pattern="[a-z0-9-]+" /></label>
       <label>Український заголовок <input v-model="form.titleUk" required /></label>

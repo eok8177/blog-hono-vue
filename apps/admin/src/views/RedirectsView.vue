@@ -37,41 +37,54 @@ async function remove(redirect: Redirect) {
 </script>
 <template>
   <section>
-    <h1>Redirects</h1>
+    <div class="admin-page-heading">
+      <div>
+        <p class="admin-eyebrow">SEO та URL</p>
+        <h1>Redirects</h1>
+        <p>Перевіряйте перенаправлення, створені після зміни slug.</p>
+      </div>
+    </div>
     <p>
       Redirects створюються автоматично під час зміни slug. Тут їх можна перевірити або видалити.
     </p>
     <p v-if="error" role="alert">{{ error }}</p>
     <p v-if="redirects.isPending.value">Завантаження…</p>
     <p v-else-if="redirects.isError.value" role="alert">Не вдалося завантажити redirects.</p>
-    <p v-else-if="!items.length">Redirects ще немає.</p>
-    <table v-else>
-      <thead>
-        <tr>
-          <th>Старий шлях</th>
-          <th>Новий шлях</th>
-          <th>Код</th>
-          <th>Створено</th>
-          <th>Дії</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="item in items" :key="item.id">
-          <td>
-            <code>{{ item.old_path }}</code>
-          </td>
-          <td>
-            <code>{{ item.new_path }}</code>
-          </td>
-          <td>{{ item.status_code }}</td>
-          <td>{{ item.created_at }}</td>
-          <td>
-            <button type="button" :disabled="deletingId === item.id" @click="remove(item)">
-              {{ deletingId === item.id ? 'Видалення…' : 'Видалити' }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <p v-else-if="!items.length" class="admin-state admin-list-card">Redirects ще немає.</p>
+    <div v-else class="admin-list-card admin-table-scroll">
+      <table class="admin-data-table">
+        <thead>
+          <tr>
+            <th>Старий шлях</th>
+            <th>Новий шлях</th>
+            <th>Код</th>
+            <th>Створено</th>
+            <th>Дії</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in items" :key="item.id">
+            <td>
+              <code>{{ item.old_path }}</code>
+            </td>
+            <td>
+              <code>{{ item.new_path }}</code>
+            </td>
+            <td>{{ item.status_code }}</td>
+            <td>{{ item.created_at }}</td>
+            <td>
+              <button
+                class="admin-danger-button"
+                type="button"
+                :disabled="deletingId === item.id"
+                @click="remove(item)"
+              >
+                {{ deletingId === item.id ? 'Видалення…' : 'Видалити' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 </template>

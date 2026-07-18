@@ -21,6 +21,7 @@ export default [
         File: 'readonly',
         HTMLInputElement: 'readonly',
         confirm: 'readonly',
+        document: 'readonly',
         window: 'readonly',
       },
       parser: vueParser,

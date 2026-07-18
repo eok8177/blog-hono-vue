@@ -1,15 +1,31 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-archive-900: #173b32;
-  --color-archive-700: #285c4d;
-  --color-paper: #f6f5ef;
-  --radius-archive: 0.5rem;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-500: #465fff;
+  --color-brand-600: #3641f5;
+  --color-brand-700: #2f36c9;
+  --color-paper: #f8fafc;
+  --radius-admin: 0.75rem;
 }
 
 @layer base {
+  :root {
+    color: #111827;
+    background: #f8fafc;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    font-synthesis: none;
+  }
   body {
-    @apply m-0 bg-paper font-sans text-slate-900;
+    @apply m-0 bg-slate-50 text-slate-800;
   }
   button,
   input,
@@ -20,61 +36,608 @@
   button {
     @apply cursor-pointer;
   }
+  a {
+    @apply text-brand-600;
+  }
   a:focus-visible,
   button:focus-visible,
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible {
-    @apply outline-3 outline-offset-2 outline-amber-500;
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+  h1 {
+    @apply mb-2 text-2xl font-bold tracking-tight text-slate-900;
+  }
+  h2 {
+    @apply text-lg font-semibold text-slate-900;
+  }
+  code {
+    @apply rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700;
   }
 }
 
 @layer components {
-  .admin-button {
-    @apply rounded-archive bg-archive-700 px-4 py-2 font-medium text-white no-underline hover:bg-archive-900 disabled:cursor-not-allowed disabled:opacity-60;
+  .admin-shell {
+    @apply flex min-h-screen bg-slate-50;
+  }
+  .admin-sidebar {
+    @apply fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 transition-transform duration-200 lg:static lg:translate-x-0;
+  }
+  .admin-sidebar-open {
+    @apply translate-x-0;
+  }
+  .admin-sidebar-backdrop {
+    @apply fixed inset-0 z-30 bg-slate-950/40 lg:hidden;
+  }
+  .admin-brand {
+    @apply mb-8 flex items-center gap-3 px-2;
+  }
+  .admin-brand-mark {
+    @apply flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-white shadow-sm;
+  }
+  .admin-brand strong,
+  .admin-sidebar-footer strong {
+    @apply block text-sm font-semibold text-slate-900;
+  }
+  .admin-brand small,
+  .admin-sidebar-footer small {
+    @apply block text-xs text-slate-400;
+  }
+  .admin-sidebar-close {
+    @apply ml-auto bg-transparent p-1 text-xl text-slate-400 shadow-none hover:bg-slate-100 hover:text-slate-700 lg:hidden;
+  }
+  .admin-nav-label {
+    @apply mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400;
+  }
+  .admin-nav-label-spaced {
+    @apply mt-7;
+  }
+  .admin-nav-link {
+    @apply mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 no-underline transition-colors hover:bg-slate-100 hover:text-slate-900;
+  }
+  .admin-nav-link-active {
+    @apply bg-brand-50 text-brand-600 hover:bg-brand-50 hover:text-brand-700;
+  }
+  .admin-nav-icon {
+    @apply flex w-5 justify-center text-base leading-none text-slate-400;
+  }
+  .admin-nav-link-active .admin-nav-icon {
+    @apply text-brand-500;
+  }
+  .admin-sidebar-footer {
+    @apply mt-auto flex items-center gap-3 border-t border-slate-100 px-2 pt-4;
+  }
+  .admin-avatar {
+    @apply flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-600;
+  }
+  .admin-main {
+    @apply min-w-0 flex-1;
+  }
+  .admin-topbar {
+    @apply sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm sm:px-7;
+  }
+  .admin-topbar-left,
+  .admin-topbar-right {
+    @apply flex items-center gap-3;
+  }
+  .admin-menu-button {
+    @apply rounded-lg bg-transparent p-2 text-lg text-slate-500 hover:bg-slate-100 lg:hidden;
+  }
+  .admin-breadcrumb {
+    @apply hidden items-center gap-2 text-sm sm:flex;
+  }
+  .admin-breadcrumb span {
+    @apply text-slate-400;
+  }
+  .admin-breadcrumb b {
+    @apply font-normal text-slate-300;
+  }
+  .admin-breadcrumb strong {
+    @apply font-medium text-slate-700;
+  }
+  .admin-status-dot {
+    @apply text-xs text-emerald-500;
+  }
+  .admin-status-text {
+    @apply hidden text-xs text-slate-500 md:inline;
+  }
+  .admin-env-badge {
+    @apply rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700;
+  }
+  .admin-logout {
+    @apply text-sm font-medium text-slate-500 no-underline hover:text-brand-600;
+  }
+  .admin-content {
+    @apply mx-auto w-full max-w-360 p-4 sm:p-6 lg:p-8;
+  }
+  .admin-empty-page {
+    @apply mx-auto max-w-2xl pt-8;
+  }
+  .admin-empty-page .admin-card p {
+    @apply text-sm text-slate-500;
+  }
+  .admin-content section > h1 {
+    @apply mt-1;
+  }
+  .admin-content section > h1 + p {
+    @apply text-sm text-slate-500;
+  }
+  .admin-page-heading {
+    @apply mb-7 flex flex-wrap items-end justify-between gap-4;
+  }
+  .admin-form-heading {
+    @apply mb-4 flex items-start justify-between gap-4;
+  }
+  .admin-form-heading h2 {
+    @apply m-0;
+  }
+  .admin-close-button {
+    @apply bg-transparent p-1 text-2xl text-slate-400 shadow-none hover:bg-slate-100 hover:text-slate-700;
+  }
+  .admin-form-grid {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+  .admin-editor-columns {
+    @apply grid gap-4 lg:grid-cols-2;
+  }
+  .admin-form-actions {
+    @apply mt-4 flex flex-wrap items-end gap-3;
+  }
+  .admin-form-actions label {
+    @apply m-0;
+  }
+  .admin-checkbox {
+    @apply flex items-center gap-2;
+  }
+  .admin-checkbox input {
+    @apply mt-0;
+  }
+  .admin-secondary-button {
+    @apply bg-slate-100 text-slate-700 shadow-none hover:bg-slate-200;
+  }
+  .admin-page-heading h1 {
+    @apply mb-1;
+  }
+  .admin-page-heading p {
+    @apply m-0 text-sm text-slate-500;
+  }
+  .admin-eyebrow {
+    @apply mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400;
+  }
+  .admin-stat-grid {
+    @apply mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4;
+  }
+  .admin-stat-card {
+    @apply relative flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 no-underline shadow-sm transition-shadow hover:shadow-md;
+  }
+  .admin-stat-card p {
+    @apply m-0 text-sm text-slate-500;
+  }
+  .admin-stat-card strong {
+    @apply mt-1 block text-2xl font-bold text-slate-900;
+  }
+  .admin-stat-icon {
+    @apply flex h-11 w-11 items-center justify-center rounded-xl text-lg font-bold;
+  }
+  .admin-stat-blue .admin-stat-icon {
+    @apply bg-brand-50 text-brand-600;
+  }
+  .admin-stat-green .admin-stat-icon {
+    @apply bg-emerald-50 text-emerald-600;
+  }
+  .admin-stat-purple .admin-stat-icon {
+    @apply bg-violet-50 text-violet-600;
+  }
+  .admin-stat-orange .admin-stat-icon {
+    @apply bg-orange-50 text-orange-600;
+  }
+  .admin-stat-arrow {
+    @apply absolute right-4 top-1/2 text-slate-300;
+  }
+  .admin-dashboard-grid {
+    @apply grid gap-5 lg:grid-cols-[1.4fr_1fr];
+  }
+  .admin-card-heading {
+    @apply mb-6 flex items-start justify-between gap-3;
+  }
+  .admin-card-heading h2 {
+    @apply m-0;
+  }
+  .admin-card-heading a {
+    @apply text-sm no-underline;
+  }
+  .admin-list-card {
+    @apply overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+  .admin-upload-card {
+    @apply flex flex-wrap items-center gap-4;
+  }
+  .admin-upload-card h2 {
+    @apply m-0;
+  }
+  .admin-upload-card p {
+    @apply m-0 text-sm text-slate-500;
+  }
+  .admin-upload-icon {
+    @apply flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-xl font-bold text-brand-600;
+  }
+  .admin-file-input {
+    @apply m-0 cursor-pointer rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-600;
+  }
+  .admin-file-input input {
+    @apply sr-only;
+  }
+  .admin-upload-alt {
+    @apply m-0 min-w-64 flex-1;
+  }
+  .admin-upload-card button {
+    @apply self-end;
+  }
+  .admin-media-grid {
+    @apply grid gap-5 sm:grid-cols-2 xl:grid-cols-3;
+  }
+  .admin-media-card {
+    @apply overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+  .admin-media-preview {
+    @apply aspect-3/2 overflow-hidden bg-slate-100;
+  }
+  .admin-media-preview img {
+    @apply h-full w-full object-cover transition-transform duration-200 hover:scale-105;
+  }
+  .admin-media-info {
+    @apply px-4 pt-4;
+  }
+  .admin-media-info strong {
+    @apply block truncate text-sm font-medium text-slate-900;
+  }
+  .admin-media-info span {
+    @apply mt-1 block text-xs text-slate-400;
+  }
+  .admin-media-actions {
+    @apply flex gap-3 px-4 py-4;
+  }
+  .admin-media-actions button {
+    @apply m-0;
+  }
+  .admin-list-toolbar {
+    @apply flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-5 py-4;
+  }
+  .admin-search {
+    @apply relative m-0 w-full max-w-sm;
+  }
+  .admin-search input {
+    @apply m-0 max-w-none pl-9;
+  }
+  .admin-search-icon {
+    @apply pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400;
+  }
+  .admin-list-count {
+    @apply text-sm text-slate-500;
+  }
+  .admin-state {
+    @apply px-5 py-12 text-center text-sm text-slate-500;
+  }
+  .admin-table-scroll {
+    @apply overflow-x-auto;
+  }
+  .admin-data-table {
+    @apply m-0 min-w-190 rounded-none border-0 shadow-none;
+  }
+  .admin-data-table th,
+  .admin-data-table td {
+    @apply px-5 py-4;
+  }
+  .admin-primary-cell strong {
+    @apply block font-medium text-slate-900;
+  }
+  .admin-primary-cell span {
+    @apply mt-1 block text-xs text-slate-400;
+  }
+  .admin-actions-heading,
+  .admin-actions-cell {
+    @apply text-right;
+  }
+  .admin-actions-cell {
+    @apply whitespace-nowrap;
+  }
+  .admin-row-link {
+    @apply mr-3 text-sm font-medium no-underline;
+  }
+  .admin-danger-button {
+    @apply bg-transparent px-0 py-0 text-sm font-medium text-red-600 shadow-none hover:bg-transparent hover:text-red-700;
+  }
+  .admin-status-badge {
+    @apply inline-flex rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  .admin-status-published {
+    @apply bg-emerald-50 text-emerald-700;
+  }
+  .admin-status-draft {
+    @apply bg-amber-50 text-amber-700;
+  }
+  .admin-status-archived {
+    @apply bg-slate-100 text-slate-600;
+  }
+  .admin-pagination {
+    @apply flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 text-sm text-slate-500;
+  }
+  .admin-pagination button {
+    @apply ml-2 bg-slate-100 text-slate-700 shadow-none hover:bg-slate-200;
+  }
+  .admin-progress-row {
+    @apply mt-5 flex justify-between text-sm text-slate-500;
+  }
+  .admin-progress-row strong {
+    @apply font-semibold text-slate-800;
+  }
+  .admin-progress {
+    @apply mt-2 h-2 overflow-hidden rounded-full bg-slate-100;
+  }
+  .admin-progress span {
+    @apply block h-full rounded-full bg-brand-500;
+  }
+  .admin-progress .admin-progress-muted {
+    @apply bg-violet-400;
+  }
+  .admin-quick-card h2 {
+    @apply mb-4;
+  }
+  .admin-quick-card a {
+    @apply flex items-center justify-between border-b border-slate-100 py-3 text-sm font-medium no-underline last:border-0;
+  }
+  .admin-quick-card a span {
+    @apply text-slate-400;
+  }
+  .admin-button,
+  .button {
+    @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white no-underline shadow-sm transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60;
   }
   .admin-input {
-    @apply mt-1 block w-full max-w-2xl rounded border border-slate-300 bg-white px-3 py-2;
+    @apply mt-1 block w-full max-w-2xl rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm;
   }
   .admin-card {
-    @apply rounded-archive bg-white p-5 shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm;
   }
   form {
-    @apply my-5 rounded-archive bg-white p-5 shadow-sm;
+    @apply my-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm;
   }
   label {
-    @apply my-3 block font-medium;
+    @apply my-3 block text-sm font-medium text-slate-700;
   }
   input:not([type='checkbox']),
   select,
   textarea {
-    @apply mt-1 block w-full max-w-2xl rounded border border-slate-300 bg-white px-3 py-2 font-normal;
+    @apply mt-1 block w-full max-w-2xl rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800 shadow-sm placeholder:text-slate-400;
+  }
+  textarea {
+    @apply min-h-24;
   }
   fieldset {
-    @apply my-4 rounded border border-slate-300 p-4;
+    @apply my-4 rounded-lg border border-slate-200 p-4;
   }
   legend {
-    @apply px-1 font-semibold;
+    @apply px-1 text-sm font-semibold text-slate-800;
   }
   button {
-    @apply rounded-archive bg-archive-700 px-3 py-2 font-medium text-white hover:bg-archive-900 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  form button + button,
+  table button + button {
+    @apply ml-2 bg-slate-100 text-slate-700 shadow-none hover:bg-slate-200;
   }
   table {
-    @apply mt-5 w-full border-collapse overflow-hidden rounded-archive bg-white shadow-sm;
+    @apply mt-5 w-full border-collapse overflow-hidden rounded-xl border border-slate-200 bg-white text-sm shadow-sm;
   }
   th {
-    @apply border-b border-slate-200 bg-slate-50 p-3 text-left text-sm;
+    @apply border-b border-slate-200 bg-slate-50 p-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
   }
   td {
-    @apply border-b border-slate-100 p-3 align-top;
+    @apply border-b border-slate-100 p-3 align-top text-slate-600;
+  }
+  tr:last-child td {
+    @apply border-b-0;
   }
   .row {
     @apply flex flex-wrap items-center justify-between gap-4;
   }
   .grid {
-    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+    @apply grid gap-5 sm:grid-cols-2 lg:grid-cols-3;
   }
   .grid article {
-    @apply rounded-archive bg-white p-5 shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm;
   }
+  [role='alert'] {
+    @apply rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700;
+  }
+  [role='status'] {
+    @apply rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700;
+  }
+  .admin-theme-toggle {
+    @apply flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 p-0 text-base text-slate-600 shadow-none hover:bg-slate-200;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  background: #101828;
+  color: #e4e7ec;
+}
+
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] .admin-shell {
+  background: #101828;
+  color: #e4e7ec;
+}
+
+:root[data-theme='dark'] .admin-sidebar,
+:root[data-theme='dark'] .admin-topbar,
+:root[data-theme='dark'] .admin-card,
+:root[data-theme='dark'] .admin-list-card,
+:root[data-theme='dark'] .admin-media-card,
+:root[data-theme='dark'] form,
+:root[data-theme='dark'] table,
+:root[data-theme='dark'] .grid article,
+:root[data-theme='dark'] .admin-stat-card {
+  border-color: #344054;
+  background: #182230;
+  color: #e4e7ec;
+}
+
+:root[data-theme='dark'] .admin-topbar {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+}
+
+:root[data-theme='dark'] .admin-sidebar-footer,
+:root[data-theme='dark'] .admin-quick-card a,
+:root[data-theme='dark'] .admin-list-toolbar,
+:root[data-theme='dark'] .admin-pagination,
+:root[data-theme='dark'] td {
+  border-color: #344054;
+}
+
+:root[data-theme='dark'] .admin-brand strong,
+:root[data-theme='dark'] .admin-sidebar-footer strong,
+:root[data-theme='dark'] .admin-primary-cell strong,
+:root[data-theme='dark'] .admin-media-info strong,
+:root[data-theme='dark'] h1,
+:root[data-theme='dark'] h2,
+:root[data-theme='dark'] .admin-stat-card strong,
+:root[data-theme='dark'] .admin-progress-row strong,
+:root[data-theme='dark'] legend {
+  color: #f2f4f7;
+}
+
+:root[data-theme='dark'] .admin-nav-link,
+:root[data-theme='dark'] .admin-status-text,
+:root[data-theme='dark'] .admin-list-count,
+:root[data-theme='dark'] .admin-state,
+:root[data-theme='dark'] .admin-media-info span,
+:root[data-theme='dark'] .admin-stat-card p,
+:root[data-theme='dark'] .admin-progress-row,
+:root[data-theme='dark'] label,
+:root[data-theme='dark'] td {
+  color: #98a2b3;
+}
+
+:root[data-theme='dark'] .admin-nav-link:hover {
+  background: #1d2939;
+  color: #f2f4f7;
+}
+
+:root[data-theme='dark'] .admin-nav-link-active {
+  background: #1d2939;
+  color: #aab4ff;
+}
+
+:root[data-theme='dark'] .admin-nav-link-active .admin-nav-icon {
+  color: #aab4ff;
+}
+
+:root[data-theme='dark'] .admin-breadcrumb span,
+:root[data-theme='dark'] .admin-breadcrumb b,
+:root[data-theme='dark'] .admin-primary-cell span,
+:root[data-theme='dark'] .admin-eyebrow,
+:root[data-theme='dark'] .admin-nav-label {
+  color: #667085;
+}
+
+:root[data-theme='dark'] .admin-breadcrumb strong,
+:root[data-theme='dark'] .admin-logout {
+  color: #d0d5dd;
+}
+
+:root[data-theme='dark'] .admin-theme-toggle {
+  background: #1d2939;
+  color: #fdb022;
+}
+
+:root[data-theme='dark'] .admin-media-preview,
+:root[data-theme='dark'] .admin-input,
+:root[data-theme='dark'] input:not([type='checkbox']),
+:root[data-theme='dark'] select,
+:root[data-theme='dark'] textarea {
+  border-color: #475467;
+  background: #101828;
+  color: #e4e7ec;
+}
+
+:root[data-theme='dark'] fieldset {
+  border-color: #344054;
+}
+
+:root[data-theme='dark'] th {
+  border-color: #344054;
+  background: #1d2939;
+  color: #98a2b3;
+}
+
+:root[data-theme='dark'] td {
+  border-color: #344054;
+}
+
+:root[data-theme='dark'] .admin-status-published {
+  background: #103b32;
+  color: #6ce9a6;
+}
+
+:root[data-theme='dark'] .admin-status-draft {
+  background: #4d2b18;
+  color: #fdb022;
+}
+
+:root[data-theme='dark'] .admin-status-archived {
+  background: #344054;
+  color: #d0d5dd;
+}
+
+:root[data-theme='dark'] .admin-stat-blue .admin-stat-icon {
+  background: #1e2a5e;
+  color: #aab4ff;
+}
+
+:root[data-theme='dark'] .admin-stat-green .admin-stat-icon {
+  background: #103b32;
+  color: #6ce9a6;
+}
+
+:root[data-theme='dark'] .admin-stat-purple .admin-stat-icon {
+  background: #312054;
+  color: #d6bbfb;
+}
+
+:root[data-theme='dark'] .admin-stat-orange .admin-stat-icon {
+  background: #4d2b18;
+  color: #fdb022;
+}
+
+:root[data-theme='dark'] .admin-progress,
+:root[data-theme='dark'] .admin-pagination button,
+:root[data-theme='dark'] .admin-secondary-button,
+:root[data-theme='dark'] form button + button,
+:root[data-theme='dark'] table button + button {
+  background: #344054;
+  color: #d0d5dd;
+}
+
+:root[data-theme='dark'] .admin-progress .admin-progress-muted {
+  background: #9b8afb;
+}
+
+:root[data-theme='dark'] .admin-quick-card a,
+:root[data-theme='dark'] .admin-card-heading a,
+:root[data-theme='dark'] a {
+  color: #aab4ff;
+}
+
+:root[data-theme='dark'] button,
+:root[data-theme='dark'] .button,
+:root[data-theme='dark'] .admin-button {
+  color: #eef2ff;
+}
+
+:root[data-theme='dark'] code {
+  background: #1d2939;
+  color: #d0d5dd;
 }
