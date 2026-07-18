@@ -30,9 +30,9 @@ export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
-const optionalVersionSchema = z.preprocess(
+const optionalRevisionSchema = z.preprocess(
   (value) => (value === '' ? undefined : value),
-  z.string().datetime().optional(),
+  z.coerce.number().int().min(0).optional(),
 );
 export const postInputSchema = z
   .object({
@@ -49,7 +49,7 @@ export const postInputSchema = z
     seoTitleEn: z.string().max(250).nullable().optional(),
     seoDescriptionUk: z.string().max(320).nullable().optional(),
     seoDescriptionEn: z.string().max(320).nullable().optional(),
-    version: optionalVersionSchema,
+    version: optionalRevisionSchema,
     categoryIds: z.array(z.string().uuid()).max(20).default([]),
     mediaIds: z.array(z.string().uuid()).max(50).default([]),
   })
@@ -71,7 +71,7 @@ const translatedPublication = z
     bodyMdEn: z.string().nullable().optional(),
     status: z.enum(statuses).default('draft'),
     isEnPublished: z.boolean().default(false),
-    version: optionalVersionSchema,
+    version: optionalRevisionSchema,
   })
   .superRefine((data, ctx) => {
     if (data.isEnPublished && (!data.titleEn || !data.bodyMdEn))
@@ -102,7 +102,7 @@ export const categoryInputSchema = z
     isEnPublished: z.boolean().default(false),
     showInMenu: z.boolean().default(false),
     menuOrder: z.number().int().min(0).max(10000).default(0),
-    version: optionalVersionSchema,
+    version: optionalRevisionSchema,
   })
   .superRefine((data, ctx) => {
     if (data.isEnPublished && !data.titleEn)

@@ -6,7 +6,7 @@
 4. Set `TURNSTILE_SECRET_KEY` only with `pnpm exec wrangler secret put`; never commit it. Set `DEV_AUTH_BYPASS` nowhere outside local `.dev.vars`.
 5. Build, dry-run, migrate then deploy: `pnpm build`; `pnpm exec wrangler d1 migrations apply <db> --env production --remote`; `pnpm exec wrangler deploy --env production --dry-run`; `pnpm deploy:production` (the script validates production configuration first).
 6. Verify Access, a public SSR page, `robots.txt`, sitemap, media headers and admin `Cache-Control: no-store`.
-7. Перед production перевірте destructive-delete flows: пост, сторінка й категорія видаляють D1 relations та audit event; медіа видаляє всі R2 variants і відмовляє при активних relations. Архівування через admin-списки не використовується.
+7. Перед production перевірте status-save flows: зміна `draft`/`published`/`archived` разом з формою вимагає актуальну revision, валідовані поля та створює audit event атомарно. Hard delete лишається admin-only; перевірте relation cleanup і поведінку відновлення медіа.
 
 ## Cost and monitoring
 

@@ -11,6 +11,7 @@ import {
 import type { AppEnv } from '../../index';
 import { requireActor, requireAdmin } from '../../middleware/auth';
 import { savePost } from '../../services/posts';
+import { listUsers } from '../../repositories/users';
 import { renderMarkdown } from '../../utils/content';
 import { Layout, Markdown } from '../../views/layout';
 
@@ -123,9 +124,12 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       }),
     );
   });
-  app.post('/api/admin/posts', async (c) =>
-    c.json(apiSuccess(await savePost(c.env, c.get('actor'), undefined, await c.req.json())), 201),
-  );
+  app.post('/api/admin/posts', async (c) => {
+    const saved = await savePost(c.env, c.get('actor'), undefined, await c.req.json());
+    if (saved.kind === 'invalid')
+      return c.json(apiError('VALIDATION_ERROR', 'Матеріал не готовий до публікації'), 422);
+    return c.json(apiSuccess(saved), 201);
+  });
   app.put('/api/admin/posts/:id', async (c) => {
     const saved = await savePost(c.env, c.get('actor'), c.req.param('id'), await c.req.json());
     if (saved.kind === 'missing') return c.json(apiError('NOT_FOUND', 'Матеріал не знайдено'), 404);
@@ -162,31 +166,6 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       ),
     ]);
     return c.json(apiSuccess({ id, status: 'deleted' }));
-  });
-  app.post('/api/admin/posts/:id/:action', async (c) => {
-    const action = c.req.param('action');
-    if (action !== 'publish') return c.json(apiError('NOT_FOUND', 'Невідома дія'), 404);
-    const timestamp = new Date().toISOString();
-    const result = await c.env.DB.prepare(
-      "UPDATE posts SET status='published',published_at=coalesce(published_at,?),updated_at=? WHERE id=?",
-    )
-      .bind(timestamp, timestamp, c.req.param('id'))
-      .run();
-    if (!result.meta.changes) return c.json(apiError('NOT_FOUND', 'Матеріал не знайдено'), 404);
-    await c.env.DB.prepare(
-      'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
-    )
-      .bind(
-        crypto.randomUUID(),
-        c.get('actor').id,
-        `post.${action}`,
-        'post',
-        c.req.param('id'),
-        '{}',
-        timestamp,
-      )
-      .run();
-    return c.json(apiSuccess({ status: 'published' }));
   });
   app.get('/api/admin/categories', async (c) => {
     const p = paginationSchema.parse(c.req.query());
@@ -279,7 +258,7 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
         d.descriptionMdUk ?? null,
         d.descriptionMdEn ?? null,
         d.status,
-        Number(d.isEnPublished),
+        Number(d.status === 'archived' ? false : d.isEnPublished),
         Number(d.showInMenu),
         d.menuOrder,
         t,
@@ -291,60 +270,64 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   app.put('/api/admin/categories/:id', async (c) => {
     const d = categoryInputSchema.parse(await c.req.json());
     const categoryId = c.req.param('id');
-    if (!d.version)
+    if (d.version === undefined)
       return c.json(apiError('VALIDATION_ERROR', 'Для оновлення потрібна version'), 422);
     if (await categoryCreatesCycle(c.env.DB, categoryId, d.parentId ?? null))
       return c.json(apiError('CATEGORY_CYCLE', 'Ієрархія категорій містить цикл'), 422);
-    const old = await c.env.DB.prepare('SELECT slug FROM categories WHERE id=?')
+    const old = await c.env.DB.prepare('SELECT slug,status,revision FROM categories WHERE id=?')
       .bind(categoryId)
-      .first<{ slug: string }>();
+      .first<{ slug: string; status: string; revision: number }>();
     if (!old) return c.json(apiError('NOT_FOUND', 'Категорію не знайдено'), 404);
     const t = new Date().toISOString();
-    const result = await c.env.DB.prepare(
-      'UPDATE categories SET parent_id=?,slug=?,title_uk=?,title_en=?,description_md_uk=?,description_md_en=?,status=?,is_en_published=?,show_in_menu=?,menu_order=?,updated_at=? WHERE id=? AND updated_at=?',
-    )
-      .bind(
-        d.parentId ?? null,
-        d.slug,
-        d.titleUk,
-        d.titleEn ?? null,
-        d.descriptionMdUk ?? null,
-        d.descriptionMdEn ?? null,
-        d.status,
-        Number(d.isEnPublished),
-        Number(d.showInMenu),
-        d.menuOrder,
-        t,
-        c.req.param('id'),
-        d.version ?? '',
-      )
-      .run();
-    if (result.meta.changes === 0)
-      return c.json(apiError('CONFLICT', 'Категорія змінилася або не існує'), 409);
-    const changes: D1PreparedStatement[] = [
+    const mutationId = crypto.randomUUID();
+    const nextRevision = d.version + 1;
+    const guard = 'EXISTS (SELECT 1 FROM categories WHERE id=? AND revision=? AND mutation_id=?)';
+    const update = c.env.DB.prepare(
+      'UPDATE categories SET parent_id=?,slug=?,title_uk=?,title_en=?,description_md_uk=?,description_md_en=?,status=?,is_en_published=?,show_in_menu=?,menu_order=?,updated_at=?,revision=revision+1,mutation_id=? WHERE id=? AND revision=?',
+    ).bind(
+      d.parentId ?? null,
+      d.slug,
+      d.titleUk,
+      d.titleEn ?? null,
+      d.descriptionMdUk ?? null,
+      d.descriptionMdEn ?? null,
+      d.status,
+      Number(d.status === 'archived' ? false : d.isEnPublished),
+      Number(d.showInMenu),
+      d.menuOrder,
+      t,
+      mutationId,
+      categoryId,
+      d.version,
+    );
+    const changes: D1PreparedStatement[] = [update];
+    const guardArgs = [categoryId, nextRevision, mutationId];
+    changes.push(
       c.env.DB.prepare(
-        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+        `INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard}`,
       ).bind(
         crypto.randomUUID(),
         c.get('actor').id,
-        'category.update',
+        old.status === d.status ? 'category.update' : 'category.status_change',
         'category',
         categoryId,
-        JSON.stringify({ slug: d.slug, status: d.status }),
+        JSON.stringify({ slug: d.slug, status: d.status, previousStatus: old.status }),
         t,
+        ...guardArgs,
       ),
-    ];
+    );
     if (old.slug !== d.slug) {
       changes.push(
         c.env.DB.prepare(
-          "UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='category' AND entity_id=?",
-        ).bind(`/en/category/${d.slug}`, `/category/${d.slug}`, categoryId),
-        c.env.DB.prepare('DELETE FROM redirects WHERE old_path IN (?,?)').bind(
+          `UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='category' AND entity_id=? AND ${guard}`,
+        ).bind(`/en/category/${d.slug}`, `/category/${d.slug}`, categoryId, ...guardArgs),
+        c.env.DB.prepare(`DELETE FROM redirects WHERE old_path IN (?,?) AND ${guard}`).bind(
           `/category/${d.slug}`,
           `/en/category/${d.slug}`,
+          ...guardArgs,
         ),
         c.env.DB.prepare(
-          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
+          `INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard}`,
         ).bind(
           crypto.randomUUID(),
           `/category/${old.slug}`,
@@ -353,9 +336,10 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
           'category',
           categoryId,
           t,
+          ...guardArgs,
         ),
         c.env.DB.prepare(
-          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
+          `INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard}`,
         ).bind(
           crypto.randomUUID(),
           `/en/category/${old.slug}`,
@@ -364,11 +348,14 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
           'category',
           categoryId,
           t,
+          ...guardArgs,
         ),
       );
     }
-    await c.env.DB.batch(changes);
-    return c.json(apiSuccess({ id: categoryId, updatedAt: t }));
+    const results = await c.env.DB.batch(changes);
+    if (!results[0]?.meta.changes)
+      return c.json(apiError('CONFLICT', 'Категорія змінилася або не існує'), 409);
+    return c.json(apiSuccess({ id: categoryId, updatedAt: t, revision: nextRevision }));
   });
   app.get('/api/admin/pages', async (c) => {
     const p = paginationSchema.parse(c.req.query());
@@ -440,31 +427,6 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       </Layout>,
     );
   });
-  app.post('/api/admin/pages/:id/:action', async (c) => {
-    const action = c.req.param('action');
-    if (action !== 'publish') return c.json(apiError('NOT_FOUND', 'Невідома дія'), 404);
-    const timestamp = new Date().toISOString();
-    const result = await c.env.DB.prepare(
-      "UPDATE pages SET status='published',published_at=COALESCE(published_at,?),updated_by=?,updated_at=? WHERE id=?",
-    )
-      .bind(timestamp, c.get('actor').id, timestamp, c.req.param('id'))
-      .run();
-    if (!result.meta.changes) return c.json(apiError('NOT_FOUND', 'Сторінку не знайдено'), 404);
-    await c.env.DB.prepare(
-      'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
-    )
-      .bind(
-        crypto.randomUUID(),
-        c.get('actor').id,
-        `page.${action}`,
-        'page',
-        c.req.param('id'),
-        '{}',
-        timestamp,
-      )
-      .run();
-    return c.json(apiSuccess({ id: c.req.param('id'), status: 'published' }));
-  });
   app.get('/api/admin/pages/:id', async (c) => {
     const row = await c.env.DB.prepare('SELECT * FROM pages WHERE id=?')
       .bind(c.req.param('id'))
@@ -494,7 +456,7 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
         d.bodyMdUk,
         d.bodyMdEn ?? null,
         d.status,
-        Number(d.isEnPublished),
+        Number(d.status === 'archived' ? false : d.isEnPublished),
         d.status === 'published' ? t : null,
         Number(d.showInMenu),
         d.menuOrder,
@@ -512,72 +474,98 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   });
   app.put('/api/admin/pages/:id', async (c) => {
     const d = pageInputSchema.parse(await c.req.json());
-    if (!d.version)
+    if (d.version === undefined)
       return c.json(apiError('VALIDATION_ERROR', 'Для оновлення потрібна version'), 422);
     const pageId = c.req.param('id');
-    const old = await c.env.DB.prepare('SELECT slug FROM pages WHERE id=?')
+    const old = await c.env.DB.prepare('SELECT slug,status,revision FROM pages WHERE id=?')
       .bind(pageId)
-      .first<{ slug: string }>();
+      .first<{ slug: string; status: string; revision: number }>();
     if (!old) return c.json(apiError('NOT_FOUND', 'Сторінку не знайдено'), 404);
     const t = new Date().toISOString();
-    const result = await c.env.DB.prepare(
-      'UPDATE pages SET slug=?,template=?,title_uk=?,title_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,show_in_menu=?,menu_order=?,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=? WHERE id=? AND updated_at=?',
-    )
-      .bind(
-        d.slug,
-        d.template,
-        d.titleUk,
-        d.titleEn ?? null,
-        d.bodyMdUk,
-        d.bodyMdEn ?? null,
-        d.status,
-        Number(d.isEnPublished),
-        Number(d.showInMenu),
-        d.menuOrder,
-        d.seoTitleUk ?? null,
-        d.seoTitleEn ?? null,
-        d.seoDescriptionUk ?? null,
-        d.seoDescriptionEn ?? null,
-        c.get('actor').id,
-        t,
-        c.req.param('id'),
-        d.version ?? '',
-      )
-      .run();
-    if (result.meta.changes === 0)
-      return c.json(apiError('CONFLICT', 'Сторінка змінилася або не існує'), 409);
-    const changes: D1PreparedStatement[] = [
+    const mutationId = crypto.randomUUID();
+    const nextRevision = d.version + 1;
+    const guard = 'EXISTS (SELECT 1 FROM pages WHERE id=? AND revision=? AND mutation_id=?)';
+    const update = c.env.DB.prepare(
+      "UPDATE pages SET slug=?,template=?,title_uk=?,title_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END,show_in_menu=?,menu_order=?,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=?,revision=revision+1,mutation_id=? WHERE id=? AND revision=?",
+    ).bind(
+      d.slug,
+      d.template,
+      d.titleUk,
+      d.titleEn ?? null,
+      d.bodyMdUk,
+      d.bodyMdEn ?? null,
+      d.status,
+      Number(d.status === 'archived' ? false : d.isEnPublished),
+      d.status,
+      t,
+      Number(d.showInMenu),
+      d.menuOrder,
+      d.seoTitleUk ?? null,
+      d.seoTitleEn ?? null,
+      d.seoDescriptionUk ?? null,
+      d.seoDescriptionEn ?? null,
+      c.get('actor').id,
+      t,
+      mutationId,
+      pageId,
+      d.version,
+    );
+    const changes: D1PreparedStatement[] = [update];
+    const guardArgs = [pageId, nextRevision, mutationId];
+    changes.push(
       c.env.DB.prepare(
-        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+        `INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard}`,
       ).bind(
         crypto.randomUUID(),
         c.get('actor').id,
-        'page.update',
+        old.status === d.status ? 'page.update' : 'page.status_change',
         'page',
         pageId,
-        JSON.stringify({ slug: d.slug, status: d.status }),
+        JSON.stringify({ slug: d.slug, status: d.status, previousStatus: old.status }),
         t,
+        ...guardArgs,
       ),
-    ];
+    );
     if (old.slug !== d.slug) {
       changes.push(
         c.env.DB.prepare(
-          "UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='page' AND entity_id=?",
-        ).bind(`/en/${d.slug}`, `/${d.slug}`, pageId),
-        c.env.DB.prepare('DELETE FROM redirects WHERE old_path IN (?,?)').bind(
+          `UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='page' AND entity_id=? AND ${guard}`,
+        ).bind(`/en/${d.slug}`, `/${d.slug}`, pageId, ...guardArgs),
+        c.env.DB.prepare(`DELETE FROM redirects WHERE old_path IN (?,?) AND ${guard}`).bind(
           `/${d.slug}`,
           `/en/${d.slug}`,
+          ...guardArgs,
         ),
         c.env.DB.prepare(
-          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
-        ).bind(crypto.randomUUID(), `/${old.slug}`, `/${d.slug}`, 301, 'page', pageId, t),
+          `INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard}`,
+        ).bind(
+          crypto.randomUUID(),
+          `/${old.slug}`,
+          `/${d.slug}`,
+          301,
+          'page',
+          pageId,
+          t,
+          ...guardArgs,
+        ),
         c.env.DB.prepare(
-          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
-        ).bind(crypto.randomUUID(), `/en/${old.slug}`, `/en/${d.slug}`, 301, 'page', pageId, t),
+          `INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard}`,
+        ).bind(
+          crypto.randomUUID(),
+          `/en/${old.slug}`,
+          `/en/${d.slug}`,
+          301,
+          'page',
+          pageId,
+          t,
+          ...guardArgs,
+        ),
       );
     }
-    await c.env.DB.batch(changes);
-    return c.json(apiSuccess({ id: pageId, updatedAt: t }));
+    const results = await c.env.DB.batch(changes);
+    if (!results[0]?.meta.changes)
+      return c.json(apiError('CONFLICT', 'Сторінка змінилася або не існує'), 409);
+    return c.json(apiSuccess({ id: pageId, updatedAt: t, revision: nextRevision }));
   });
   app.use('/api/admin/users', requireAdmin);
   app.use('/api/admin/users/*', requireAdmin);
@@ -587,20 +575,7 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   app.use('/api/admin/audit-log', requireAdmin);
   app.get('/api/admin/users', async (c) => {
     const p = paginationSchema.parse(c.req.query());
-    const results = await c.env.DB.batch([
-      c.env.DB.prepare(
-        'SELECT id,email,name,role,is_active,last_seen_at,created_at,updated_at FROM users ORDER BY created_at LIMIT ? OFFSET ?',
-      ).bind(p.pageSize, (p.page - 1) * p.pageSize),
-      c.env.DB.prepare('SELECT count(*) count FROM users'),
-    ]);
-    return c.json(
-      apiSuccess({
-        items: results[0]!.results,
-        total: Number((results[1]!.results[0] as { count: number }).count),
-        page: p.page,
-        pageSize: p.pageSize,
-      }),
-    );
+    return c.json(apiSuccess(await listUsers(c.env, p.page, p.pageSize)));
   });
   app.post('/api/admin/users', async (c) => {
     const d = userInputSchema.parse(await c.req.json());
@@ -630,46 +605,74 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       .bind(c.req.param('id'))
       .first<{ role: 'admin' | 'editor'; is_active: number }>();
     if (!target) return c.json(apiError('NOT_FOUND', 'Користувача не знайдено'), 404);
-    if (target.role === 'admin' && target.is_active && (!d.isActive || d.role !== 'admin')) {
-      const count = await c.env.DB.prepare(
-        "SELECT count(*) count FROM users WHERE role='admin' AND is_active=1",
-      ).first<{ count: number }>();
-      if ((count?.count ?? 0) <= 1)
-        return c.json(apiError('LAST_ADMIN', 'Не можна деактивувати останнього active admin'), 422);
-    }
+    const userId = c.req.param('id');
     const t = new Date().toISOString();
-    await c.env.DB.batch([
+    const update = c.env.DB.prepare(
+      "UPDATE users SET email=?,name=?,role=?,is_active=?,updated_at=? WHERE id=? AND NOT (role='admin' AND is_active=1 AND (?=0 OR ?<>'admin') AND NOT EXISTS (SELECT 1 FROM users WHERE role='admin' AND is_active=1 AND id<>?))",
+    ).bind(
+      d.email,
+      d.name,
+      d.role,
+      Number(d.isActive),
+      t,
+      userId,
+      Number(d.isActive),
+      d.role,
+      userId,
+    );
+    const results = await c.env.DB.batch([
+      update,
       c.env.DB.prepare(
-        'UPDATE users SET email=?,name=?,role=?,is_active=?,updated_at=? WHERE id=?',
-      ).bind(d.email, d.name, d.role, Number(d.isActive), t, c.req.param('id')),
-      c.env.DB.prepare(
-        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM users WHERE id=? AND updated_at=?)',
       ).bind(
         crypto.randomUUID(),
         c.get('actor').id,
         'user.update',
         'user',
-        c.req.param('id'),
+        userId,
         JSON.stringify({ email: d.email, role: d.role, isActive: d.isActive }),
+        t,
+        userId,
         t,
       ),
     ]);
-    return c.json(apiSuccess({ id: c.req.param('id') }));
+    if (!results[0]?.meta.changes) {
+      if (target.role === 'admin' && target.is_active && (!d.isActive || d.role !== 'admin'))
+        return c.json(apiError('LAST_ADMIN', 'Не можна деактивувати останнього active admin'), 422);
+      return c.json(apiError('CONFLICT', 'Користувач змінився під час операції'), 409);
+    }
+    return c.json(apiSuccess({ id: userId }));
   });
   app.delete('/api/admin/users/:id', async (c) => {
+    const userId = c.req.param('id');
     const target = await c.env.DB.prepare('SELECT role,is_active FROM users WHERE id=?')
-      .bind(c.req.param('id'))
+      .bind(userId)
       .first<{ role: 'admin' | 'editor'; is_active: number }>();
     if (!target) return c.json(apiError('NOT_FOUND', 'Користувача не знайдено'), 404);
-    if (target.role === 'admin' && target.is_active) {
-      const count = await c.env.DB.prepare(
-        "SELECT count(*) count FROM users WHERE role='admin' AND is_active=1",
-      ).first<{ count: number }>();
-      if ((count?.count ?? 0) <= 1)
-        return c.json(apiError('LAST_ADMIN', 'Не можна видалити останнього active admin'), 422);
-    }
-    await c.env.DB.prepare('DELETE FROM users WHERE id=?').bind(c.req.param('id')).run();
-    return c.json(apiSuccess({ id: c.req.param('id') }));
+    const timestamp = new Date().toISOString();
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        "UPDATE users SET is_active=0,updated_at=? WHERE id=? AND NOT (role='admin' AND is_active=1 AND NOT EXISTS (SELECT 1 FROM users WHERE role='admin' AND is_active=1 AND id<>?))",
+      ).bind(timestamp, userId, userId),
+      c.env.DB.prepare(
+        'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM users WHERE id=? AND updated_at=?)',
+      ).bind(
+        crypto.randomUUID(),
+        c.get('actor').id,
+        'user.deactivate',
+        'user',
+        userId,
+        '{}',
+        timestamp,
+        userId,
+        timestamp,
+      ),
+    ]);
+    if (!results[0]?.meta.changes)
+      return target.role === 'admin' && target.is_active
+        ? c.json(apiError('LAST_ADMIN', 'Не можна деактивувати останнього active admin'), 422)
+        : c.json(apiError('CONFLICT', 'Користувач змінився під час операції'), 409);
+    return c.json(apiSuccess({ id: userId, status: 'deactivated' }));
   });
   app.get('/api/admin/settings', async (c) =>
     c.json(

@@ -15,6 +15,7 @@ type Page = {
   show_in_menu: number;
   menu_order: number;
   updated_at: string;
+  revision: number;
 };
 const client = useQueryClient();
 const editing = ref(false);
@@ -31,7 +32,7 @@ const form = reactive({
   isEnPublished: false,
   showInMenu: false,
   menuOrder: 0,
-  version: '',
+  version: undefined as number | undefined,
 });
 const pages = useQuery({
   queryKey: ['pages'],
@@ -52,7 +53,7 @@ function reset() {
     isEnPublished: false,
     showInMenu: false,
     menuOrder: 0,
-    version: '',
+    version: undefined,
   });
 }
 function edit(item: Page) {
@@ -69,7 +70,7 @@ function edit(item: Page) {
     isEnPublished: Boolean(item.is_en_published),
     showInMenu: Boolean(item.show_in_menu),
     menuOrder: item.menu_order,
-    version: item.updated_at,
+    version: item.revision,
   });
 }
 const save = useMutation({
@@ -99,7 +100,11 @@ async function remove(item: Page) {
   }
 }
 function statusLabel(status: string) {
-  return status === 'published' ? 'Опубліковано' : 'Чернетка';
+  return status === 'published'
+    ? 'Опубліковано'
+    : status === 'archived'
+      ? 'Архівовано'
+      : 'Чернетка';
 }
 </script>
 <template>
@@ -165,6 +170,7 @@ function statusLabel(status: string) {
           <select v-model="form.status">
             <option>draft</option>
             <option>published</option>
+            <option>archived</option>
           </select></label
         ><button :disabled="save.isPending.value">
           {{ save.isPending.value ? 'Збереження…' : 'Зберегти' }}</button

@@ -18,23 +18,39 @@ export async function findPost(env: Bindings, slug: string, locale: Locale) {
     .first<Record<string, unknown>>();
 }
 
+/**
+ * D1 batch statements run in order. A failed conditional UPDATE does not itself
+ * fail the batch, so every dependent statement is tied to a fresh, random
+ * mutation_id written by that UPDATE. A concurrent writer can never satisfy
+ * another request's marker, even if both requests share a clock tick.
+ */
+function mutationGuard(table: 'posts', id: string, revision: number, mutationId: string) {
+  return {
+    sql: `EXISTS (SELECT 1 FROM ${table} WHERE id=? AND revision=? AND mutation_id=?)`,
+    bindings: [id, revision, mutationId] as const,
+  };
+}
+
 export async function savePost(env: Bindings, actor: Actor, id: string | undefined, body: unknown) {
   const data = postInputSchema.parse(body);
   const timestamp = now();
   const existing = id
-    ? await env.DB.prepare('SELECT updated_at,slug FROM posts WHERE id=?')
+    ? await env.DB.prepare('SELECT revision,slug,status FROM posts WHERE id=?')
         .bind(id)
-        .first<{ updated_at: string; slug: string }>()
+        .first<{ revision: number; slug: string; status: 'draft' | 'published' | 'archived' }>()
     : null;
   if (id && !existing) return { kind: 'missing' as const };
-  // The version is mandatory for updates. A missing version must never become an unconditional write.
-  if (id && !data.version) return { kind: 'invalid' as const };
+  if (id && data.version === undefined) return { kind: 'invalid' as const };
+  if (data.status === 'published' && (!data.titleUk.trim() || !data.bodyMdUk.trim()))
+    return { kind: 'invalid' as const };
 
   const postId = id ?? crypto.randomUUID();
-  const publishedAt = data.status === 'published' ? timestamp : null;
+  const isEnPublished = data.status === 'archived' ? false : data.isEnPublished;
+  const mutationId = crypto.randomUUID();
+  const nextRevision = (data.version ?? -1) + 1;
   const statement = id
     ? env.DB.prepare(
-        `UPDATE posts SET slug=?,title_uk=?,title_en=?,excerpt_uk=?,excerpt_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=? WHERE id=? AND updated_at=?`,
+        `UPDATE posts SET slug=?,title_uk=?,title_en=?,excerpt_uk=?,excerpt_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=?,revision=revision+1,mutation_id=? WHERE id=? AND revision=?`,
       ).bind(
         data.slug,
         data.titleUk,
@@ -44,20 +60,21 @@ export async function savePost(env: Bindings, actor: Actor, id: string | undefin
         data.bodyMdUk,
         data.bodyMdEn ?? null,
         data.status,
-        Number(data.isEnPublished),
+        Number(isEnPublished),
         data.status,
-        publishedAt,
+        timestamp,
         data.seoTitleUk ?? null,
         data.seoTitleEn ?? null,
         data.seoDescriptionUk ?? null,
         data.seoDescriptionEn ?? null,
         actor.id,
         timestamp,
+        mutationId,
         postId,
         data.version,
       )
     : env.DB.prepare(
-        `INSERT INTO posts (id,slug,title_uk,title_en,excerpt_uk,excerpt_en,body_md_uk,body_md_en,status,is_en_published,published_at,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO posts (id,slug,title_uk,title_en,excerpt_uk,excerpt_en,body_md_uk,body_md_en,status,is_en_published,published_at,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at,revision,mutation_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       ).bind(
         postId,
         data.slug,
@@ -68,8 +85,8 @@ export async function savePost(env: Bindings, actor: Actor, id: string | undefin
         data.bodyMdUk,
         data.bodyMdEn ?? null,
         data.status,
-        Number(data.isEnPublished),
-        publishedAt,
+        Number(isEnPublished),
+        data.status === 'published' ? timestamp : null,
         data.seoTitleUk ?? null,
         data.seoTitleEn ?? null,
         data.seoDescriptionUk ?? null,
@@ -78,26 +95,30 @@ export async function savePost(env: Bindings, actor: Actor, id: string | undefin
         actor.id,
         timestamp,
         timestamp,
+        0,
+        mutationId,
       );
 
   const statements: D1PreparedStatement[] = [statement];
-  statements.push(env.DB.prepare('DELETE FROM post_categories WHERE post_id=?').bind(postId));
+  const guard = mutationGuard('posts', postId, id ? nextRevision : 0, mutationId);
   statements.push(
+    env.DB.prepare(`DELETE FROM post_categories WHERE post_id=? AND ${guard.sql}`).bind(
+      postId,
+      ...guard.bindings,
+    ),
     ...data.categoryIds.map((categoryId) =>
       env.DB.prepare(
-        'INSERT INTO post_categories(post_id,category_id,created_at) VALUES(?,?,?)',
-      ).bind(postId, categoryId, timestamp),
+        `INSERT INTO post_categories(post_id,category_id,created_at) SELECT ?,?,? WHERE ${guard.sql}`,
+      ).bind(postId, categoryId, timestamp, ...guard.bindings),
     ),
-  );
-  statements.push(env.DB.prepare('DELETE FROM post_media WHERE post_id=?').bind(postId));
-  statements.push(
+    env.DB.prepare(`DELETE FROM post_media WHERE post_id=? AND ${guard.sql}`).bind(
+      postId,
+      ...guard.bindings,
+    ),
     ...data.mediaIds.map((mediaId, position) =>
-      env.DB.prepare('INSERT INTO post_media(post_id,media_id,role,position) VALUES(?,?,?,?)').bind(
-        postId,
-        mediaId,
-        'gallery',
-        position,
-      ),
+      env.DB.prepare(
+        `INSERT INTO post_media(post_id,media_id,role,position) SELECT ?,?,?,? WHERE ${guard.sql}`,
+      ).bind(postId, mediaId, 'gallery', position, ...guard.bindings),
     ),
   );
 
@@ -107,38 +128,54 @@ export async function savePost(env: Bindings, actor: Actor, id: string | undefin
       { oldPath: `/en/post/${existing.slug}`, newPath: `/en/post/${data.slug}` },
     ];
     statements.push(
-      env.DB.prepare('DELETE FROM redirects WHERE old_path IN (?,?)').bind(
+      env.DB.prepare(`DELETE FROM redirects WHERE old_path IN (?,?) AND ${guard.sql}`).bind(
         `/post/${data.slug}`,
         `/en/post/${data.slug}`,
+        ...guard.bindings,
       ),
       env.DB.prepare(
-        "UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='post' AND entity_id=?",
-      ).bind(`/en/post/${data.slug}`, `/post/${data.slug}`, postId),
+        `UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='post' AND entity_id=? AND ${guard.sql}`,
+      ).bind(`/en/post/${data.slug}`, `/post/${data.slug}`, postId, ...guard.bindings),
       ...aliases.map((alias) =>
         env.DB.prepare(
-          'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
-        ).bind(crypto.randomUUID(), alias.oldPath, alias.newPath, 301, 'post', postId, timestamp),
+          `INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard.sql}`,
+        ).bind(
+          crypto.randomUUID(),
+          alias.oldPath,
+          alias.newPath,
+          301,
+          'post',
+          postId,
+          timestamp,
+          ...guard.bindings,
+        ),
       ),
     );
   }
   statements.push(
     env.DB.prepare(
-      'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+      `INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard.sql}`,
     ).bind(
       crypto.randomUUID(),
       actor.id,
-      id ? 'post.update' : 'post.create',
+      id && existing?.status !== data.status
+        ? 'post.status_change'
+        : id
+          ? 'post.update'
+          : 'post.create',
       'post',
       postId,
       JSON.stringify({
         slug: data.slug,
         status: data.status,
-        englishPublished: data.isEnPublished,
+        previousStatus: existing?.status ?? null,
+        englishPublished: isEnPublished,
       }),
       timestamp,
+      ...guard.bindings,
     ),
   );
   const results = await env.DB.batch(statements);
   if (id && !results[0]?.meta.changes) return { kind: 'conflict' as const };
-  return { kind: 'ok' as const, id: postId };
+  return { kind: 'ok' as const, id: postId, revision: id ? nextRevision : 0 };
 }

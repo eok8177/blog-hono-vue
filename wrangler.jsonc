@@ -41,6 +41,19 @@
         "ACCESS_AUD": "",
         "TURNSTILE_SITE_KEY": "",
       },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "fauna-archive-staging-db",
+          "migrations_dir": "./migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "fauna-archive-media-staging",
+        },
+      ],
     },
     "production": {
       "name": "fauna-archive-production",
@@ -65,18 +78,6 @@
           "bucket_name": "flora-fauna-media",
         },
       ],
-      "kv_namespaces": [
-        {
-          "binding": "SESSION",
-          "id": "cbe552a58d3b4b06934f97457c65f0a1",
-        },
-      ],
     },
   },
-  "kv_namespaces": [
-    {
-      "binding": "SESSION",
-      "id": "cbe552a58d3b4b06934f97457c65f0a1",
-    },
-  ],
 }

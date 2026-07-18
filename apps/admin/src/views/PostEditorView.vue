@@ -22,7 +22,7 @@ const form = reactive({
   seoDescriptionEn: '',
   categoryIds: [] as string[],
   mediaIds: [] as string[],
-  version: '',
+  version: undefined as number | undefined,
 });
 const error = ref('');
 const saving = ref(false);
@@ -43,6 +43,7 @@ type StoredPost = {
   status: string;
   is_en_published: number;
   updated_at: string;
+  revision: number;
   mediaIds: string[];
   categoryIds: string[];
 };
@@ -77,7 +78,7 @@ onMounted(async () => {
       seoDescriptionEn: post.seo_description_en ?? '',
       mediaIds: post.mediaIds,
       categoryIds: post.categoryIds,
-      version: post.updated_at,
+      version: post.revision,
     });
     dirty.value = false;
   } catch (e) {
@@ -172,6 +173,7 @@ async function save() {
         <select v-model="form.status">
           <option>draft</option>
           <option>published</option>
+          <option>archived</option>
         </select></label
       >
       <button :disabled="saving">{{ saving ? 'Збереження…' : 'Зберегти' }}</button>

@@ -18,6 +18,7 @@ export type AppEnv = {
 const app = new Hono<AppEnv>();
 function securityHeaders(c: Context<AppEnv>, response: Response): Response {
   const headers = new Headers(response.headers);
+  headers.set('X-Request-ID', c.get('requestId'));
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
@@ -41,6 +42,7 @@ function securityHeaders(c: Context<AppEnv>, response: Response): Response {
 }
 app.use('*', async (c, next) => {
   c.set('requestId', crypto.randomUUID());
+  const startedAt = Date.now();
   c.set('cspNonce', btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16)))));
   try {
     runtimeConfig(c.env);
@@ -49,8 +51,10 @@ app.use('*', async (c, next) => {
     console.error(
       JSON.stringify({
         requestId: c.get('requestId'),
+        method: c.req.method,
         path: c.req.path,
-        error: error instanceof Error ? error.message : 'unknown',
+        durationMs: Date.now() - startedAt,
+        errorCode: error instanceof ZodError ? 'VALIDATION_ERROR' : 'INTERNAL',
       }),
     );
     let response: Response;
@@ -84,6 +88,15 @@ app.use('*', async (c, next) => {
     return securityHeaders(c, response);
   }
   c.res = securityHeaders(c, c.res);
+  console.info(
+    JSON.stringify({
+      requestId: c.get('requestId'),
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      durationMs: Date.now() - startedAt,
+    }),
+  );
 });
 // Defense in depth: Access protects these paths at the edge and the Worker verifies identity too.
 app.use('/admin', requireActor);
@@ -117,6 +130,7 @@ app.get('/sitemap.xml', async (c) => {
       .replaceAll("'", '&apos;');
   const urls = [
     `<url><loc>${base}/</loc></url>`,
+    `<url><loc>${base}/en/</loc></url>`,
     ...(
       (content?.results ?? []) as Array<{
         slug: string;

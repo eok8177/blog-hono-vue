@@ -55,6 +55,10 @@ export const requireActor: MiddlewareHandler<{
     .first<Actor>();
   if (!actor || (actor.role !== 'admin' && actor.role !== 'editor'))
     return c.json(apiError('FORBIDDEN', 'Доступ заборонено'), 403);
+  const timestamp = new Date().toISOString();
+  await DB.prepare('UPDATE users SET last_seen_at=?,updated_at=? WHERE id=? AND is_active=1')
+    .bind(timestamp, timestamp, actor.id)
+    .run();
   c.set('actor', actor);
   await next();
 };
