@@ -29,8 +29,8 @@
   "r2_buckets": [
     {
       "binding": "MEDIA",
-      "bucket_name": "fauna-archive-media-dev"
-    }
+      "bucket_name": "fauna-archive-media-dev",
+    },
   ],
   "env": {
     "staging": {
@@ -52,6 +52,26 @@
         "ACCESS_AUD": "",
         "TURNSTILE_SITE_KEY": "",
       },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "flora-fauna-db",
+          "database_id": "629a17e8-4abb-41e2-9936-ae886b1c55ef",
+          "migrations_dir": "./migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "flora-fauna-media",
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "SESSION",
+          "id": "cbe552a58d3b4b06934f97457c65f0a1",
+        },
+      ],
     },
   },
   "kv_namespaces": [
@@ -59,5 +79,5 @@
       "binding": "SESSION",
       "id": "cbe552a58d3b4b06934f97457c65f0a1",
     },
-  ]
+  ],
 }
