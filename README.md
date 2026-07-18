@@ -32,5 +32,6 @@ Public HTML рендериться Hono JSX без Vue. `/admin/` — окрем
 - Production deployment запускається лише через `pnpm deploy:production`, який вимагає HTTPS `SITE_URL`, Access domain/audience та відсутність `DEV_AUTH_BYPASS`.
 - Адмін HTML додатково перевіряє Access JWT/роль у Worker; API має `no-store`, public HTML має edge-cache TTL до 5 хвилин.
 - Upload приймає лише WebP variants із перевіркою magic bytes, розміру, dimensions, aspect ratio та pixel limit. Невідомий media variant повертає 404.
+- Архівування в admin-списках постів, сторінок і категорій замінено на незворотне повне видалення з перевіркою зв'язків та audit log. Для медіа повне видалення також прибирає всі R2 objects; операцію виконує лише admin.
 - E2E тести ізольовані в `e2e/` через `playwright.config.ts`; перед локальним запуском один раз виконайте `pnpm exec playwright install chromium`.
 - Повний локальний набір: `pnpm verify`, `pnpm db:migrate:local`, `pnpm db:seed:local`, `pnpm test:e2e`.
