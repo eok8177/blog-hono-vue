@@ -2,6 +2,50 @@ import { postInputSchema, type Locale } from '@fauna/shared';
 import { now } from '../utils/content';
 import type { Bindings, Actor } from '../env';
 
+type Pagination = { page: number; pageSize: number };
+
+export async function listAdminPosts(env: Bindings, pagination: Pagination, search: string) {
+  const where = search ? 'WHERE title_uk LIKE ? OR title_en LIKE ?' : '';
+  const args = search ? [`%${search}%`, `%${search}%`] : [];
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT id,slug,title_uk,title_en,status,is_en_published,updated_at FROM posts ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+    ).bind(...args, pagination.pageSize, (pagination.page - 1) * pagination.pageSize),
+    env.DB.prepare(`SELECT count(*) count FROM posts ${where}`).bind(...args),
+  ]);
+
+  return {
+    items: results[0]!.results,
+    total: Number((results[1]!.results[0] as { count: number }).count),
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+  };
+}
+
+export async function findAdminPost(env: Bindings, id: string) {
+  return env.DB.prepare('SELECT * FROM posts WHERE id=?').bind(id).first<Record<string, unknown>>();
+}
+
+export async function findAdminPostWithRelations(env: Bindings, id: string) {
+  const post = await findAdminPost(env, id);
+  if (!post) return null;
+
+  const relations = await env.DB.batch([
+    env.DB.prepare('SELECT media_id FROM post_media WHERE post_id=? ORDER BY position').bind(id),
+    env.DB.prepare('SELECT category_id FROM post_categories WHERE post_id=?').bind(id),
+  ]);
+
+  return {
+    ...post,
+    mediaIds: (relations[0]!.results as Array<{ media_id: string }>).map(
+      (relation) => relation.media_id,
+    ),
+    categoryIds: (relations[1]!.results as Array<{ category_id: string }>).map(
+      (relation) => relation.category_id,
+    ),
+  };
+}
+
 export async function listPublished(env: Bindings, locale: Locale, limit = 10) {
   const translation = locale === 'en' ? ' AND is_en_published=1' : '';
   return env.DB.prepare(
@@ -29,6 +73,33 @@ function mutationGuard(table: 'posts', id: string, revision: number, mutationId:
     sql: `EXISTS (SELECT 1 FROM ${table} WHERE id=? AND revision=? AND mutation_id=?)`,
     bindings: [id, revision, mutationId] as const,
   };
+}
+
+export async function deletePost(env: Bindings, actor: Actor, id: string) {
+  const post = await env.DB.prepare('SELECT id,slug FROM posts WHERE id=?')
+    .bind(id)
+    .first<{ id: string; slug: string }>();
+  if (!post) return { kind: 'missing' as const };
+
+  const timestamp = now();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM post_categories WHERE post_id=?').bind(id),
+    env.DB.prepare('DELETE FROM post_media WHERE post_id=?').bind(id),
+    env.DB.prepare("DELETE FROM redirects WHERE entity_type='post' AND entity_id=?").bind(id),
+    env.DB.prepare('DELETE FROM posts WHERE id=?').bind(id),
+    env.DB.prepare(
+      'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+    ).bind(
+      crypto.randomUUID(),
+      actor.id,
+      'post.delete',
+      'post',
+      id,
+      JSON.stringify({ slug: post.slug }),
+      timestamp,
+    ),
+  ]);
+  return { kind: 'ok' as const, id };
 }
 
 export async function savePost(env: Bindings, actor: Actor, id: string | undefined, body: unknown) {
