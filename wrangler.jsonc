@@ -21,8 +21,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "flora-fauna-db",
-      "database_id": "629a17e8-4abb-41e2-9936-ae886b1c55ef",
+      "database_name": "fauna-archive-dev",
       "migrations_dir": "./migrations",
     },
   ],
