@@ -13,20 +13,25 @@
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "vars": {
     "ENVIRONMENT": "development",
-    "SITE_URL": "http://localhost:8787",
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
-    "TURNSTILE_SITE_KEY": "",
+    "SITE_URL": "https://blog-cf.eok8177.workers.dev/",
+    "ACCESS_TEAM_DOMAIN": "eok.cloudflareaccess.com",
+    "ACCESS_AUD": "c81f58275a43945e724175979b784c9440cc98ebcf3bec6a5cf2cbb7b39b7187",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAACoBCAOcSFmkVfIp",
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "fauna-archive-dev",
-      "database_id": "REPLACE_WITH_D1_ID",
+      "database_name": "flora-fauna-db",
+      "database_id": "629a17e8-4abb-41e2-9936-ae886b1c55ef",
       "migrations_dir": "./migrations",
     },
   ],
-  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "fauna-archive-media-dev" }],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "fauna-archive-media-dev"
+    }
+  ],
   "env": {
     "staging": {
       "name": "fauna-archive-staging",
@@ -49,4 +54,10 @@
       },
     },
   },
+  "kv_namespaces": [
+    {
+      "binding": "SESSION",
+      "id": "cbe552a58d3b4b06934f97457c65f0a1",
+    },
+  ]
 }
