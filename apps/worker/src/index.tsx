@@ -7,6 +7,7 @@ import type { Actor, Bindings } from './env';
 import { runtimeConfig } from './config';
 import { requireActor } from './middleware/auth';
 import { registerAdminRoutes } from './routes/api/admin';
+import { registerMediaRoutes } from './routes/api/media';
 import { registerPublicRoutes } from './routes/public';
 import { Layout } from './views/layout';
 import { publicCss } from './views/public.css';
@@ -171,7 +172,7 @@ app.get('/sitemap.xml', async (c) => {
 app.get('/en', (c) => c.redirect('/en/', 301));
 app.get('/admin', (c) => c.redirect('/admin/', 301));
 registerAdminRoutes(app);
-
+registerMediaRoutes(app);
 registerPublicRoutes(app);
 
 app.get('/admin/assets/*', async (c) => {
