@@ -1,0 +1,47 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "fauna-archive",
+  "main": "apps/worker/src/index.tsx",
+  "compatibility_date": "2026-02-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "./apps/admin/dist", "binding": "ASSETS", "not_found_handling": "none" },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "SITE_URL": "http://localhost:8787",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "TURNSTILE_SITE_KEY": "",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fauna-archive-dev",
+      "database_id": "REPLACE_WITH_D1_ID",
+      "migrations_dir": "./migrations",
+    },
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "fauna-archive-media-dev" }],
+  "env": {
+    "staging": {
+      "name": "fauna-archive-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "SITE_URL": "https://staging.example.invalid",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": "",
+        "TURNSTILE_SITE_KEY": "",
+      },
+    },
+    "production": {
+      "name": "fauna-archive-production",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "SITE_URL": "https://example.invalid",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": "",
+        "TURNSTILE_SITE_KEY": "",
+      },
+    },
+  },
+}

@@ -1,0 +1,28 @@
+{
+  "name": "fauna-south-ukraine-archive",
+  "private": true,
+  "packageManager": "pnpm@10.15.1",
+  "scripts": {
+    "dev": "pnpm --filter @fauna/worker dev",
+    "build": "pnpm --filter @fauna/admin build && pnpm --filter @fauna/worker build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "db:migrate:local": "wrangler d1 migrations apply fauna-archive-dev --local",
+    "db:seed:local": "wrangler d1 execute fauna-archive-dev --local --file scripts/seed.sql"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.3"
+  }
+}

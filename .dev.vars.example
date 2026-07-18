@@ -1,0 +1,4 @@
+# Local only. Never set DEV_AUTH_BYPASS in staging or production.
+DEV_AUTH_BYPASS=true
+DEV_AUTH_EMAIL=admin@example.test
+# TURNSTILE_SECRET_KEY=
