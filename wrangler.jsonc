@@ -4,7 +4,12 @@
   "main": "apps/worker/src/index.tsx",
   "compatibility_date": "2026-02-24",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": "./apps/admin/dist", "binding": "ASSETS", "not_found_handling": "none" },
+  "assets": {
+    "directory": "./apps/admin/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+    "run_worker_first": true,
+  },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "vars": {
     "ENVIRONMENT": "development",

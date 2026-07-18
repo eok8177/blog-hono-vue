@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "scripts": {
-    "dev": "pnpm --filter @fauna/worker dev",
+    "dev": "pnpm --filter @fauna/admin build && concurrently -k -n admin,worker -c cyan,green \"pnpm --filter @fauna/admin build --watch\" \"pnpm --filter @fauna/worker dev\"",
     "build": "pnpm --filter @fauna/admin build && pnpm --filter @fauna/worker build",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -19,6 +19,7 @@
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.57.0",
     "@types/node": "^24.10.1",
+    "concurrently": "^10.0.3",
     "eslint": "^9.39.1",
     "prettier": "^3.6.2",
     "tsx": "^4.19.2",

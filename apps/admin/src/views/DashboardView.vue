@@ -13,12 +13,14 @@ const dashboard = useQuery({
     }>('/dashboard'),
 });
 const data = computed(() => dashboard.data.value);
+const isLoading = computed(() => dashboard.isPending.value);
+const hasError = computed(() => dashboard.isError.value);
 </script>
 <template>
   <section>
     <h1>Огляд</h1>
-    <p v-if="dashboard.isPending">Завантаження…</p>
-    <p v-else-if="dashboard.isError">Не вдалося завантажити дані.</p>
+    <p v-if="isLoading">Завантаження…</p>
+    <p v-else-if="hasError">Не вдалося завантажити дані.</p>
     <div v-else-if="data" class="grid">
       <article v-for="item in data.posts" :key="item.status">
         <b>{{ item.count }}</b

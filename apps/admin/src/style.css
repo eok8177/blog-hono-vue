@@ -1,91 +1,80 @@
-:root {
-  font-family: system-ui, sans-serif;
-  color: #173b32;
-  background: #f6f5ef;
+@import 'tailwindcss';
+
+@theme {
+  --color-archive-900: #173b32;
+  --color-archive-700: #285c4d;
+  --color-paper: #f6f5ef;
+  --radius-archive: 0.5rem;
 }
-body {
-  margin: 0;
-}
-header {
-  padding: 1rem 5%;
-  background: #173b32;
-  color: white;
-  display: flex;
-  gap: 2rem;
-  justify-content: space-between;
-}
-nav {
-  display: flex;
-  gap: 1rem;
-}
-a {
-  color: inherit;
-}
-main {
-  max-width: 1000px;
-  margin: auto;
-  padding: 2rem;
-}
-label {
-  display: block;
-  margin: 1rem 0;
-}
-input,
-textarea,
-select {
-  display: block;
-  width: min(100%, 680px);
-  padding: 0.6rem;
-  margin-top: 0.3rem;
-  font: inherit;
-}
-.grid {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.grid article {
-  background: white;
-  padding: 1.5rem;
-  min-width: 140px;
-}
-.grid b {
-  font-size: 2rem;
-}
-.row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.button,
-button {
-  background: #285c4d;
-  color: white;
-  padding: 0.6rem 1rem;
-  border: 0;
-  border-radius: 0.3rem;
-  text-decoration: none;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-td,
-th {
-  border-bottom: 1px solid #ccc;
-  padding: 0.7rem;
-  text-align: left;
-}
-fieldset {
-  border: 1px solid #aaa;
-  margin: 1rem 0;
-}
-@media (max-width: 600px) {
-  header {
-    display: block;
+
+@layer base {
+  body {
+    @apply m-0 bg-paper font-sans text-slate-900;
   }
-  nav {
-    margin-top: 1rem;
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button {
+    @apply cursor-pointer;
+  }
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply outline-3 outline-offset-2 outline-amber-500;
+  }
+}
+
+@layer components {
+  .admin-button {
+    @apply rounded-archive bg-archive-700 px-4 py-2 font-medium text-white no-underline hover:bg-archive-900 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .admin-input {
+    @apply mt-1 block w-full max-w-2xl rounded border border-slate-300 bg-white px-3 py-2;
+  }
+  .admin-card {
+    @apply rounded-archive bg-white p-5 shadow-sm;
+  }
+  form {
+    @apply my-5 rounded-archive bg-white p-5 shadow-sm;
+  }
+  label {
+    @apply my-3 block font-medium;
+  }
+  input:not([type='checkbox']),
+  select,
+  textarea {
+    @apply mt-1 block w-full max-w-2xl rounded border border-slate-300 bg-white px-3 py-2 font-normal;
+  }
+  fieldset {
+    @apply my-4 rounded border border-slate-300 p-4;
+  }
+  legend {
+    @apply px-1 font-semibold;
+  }
+  button {
+    @apply rounded-archive bg-archive-700 px-3 py-2 font-medium text-white hover:bg-archive-900 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  table {
+    @apply mt-5 w-full border-collapse overflow-hidden rounded-archive bg-white shadow-sm;
+  }
+  th {
+    @apply border-b border-slate-200 bg-slate-50 p-3 text-left text-sm;
+  }
+  td {
+    @apply border-b border-slate-100 p-3 align-top;
+  }
+  .row {
+    @apply flex flex-wrap items-center justify-between gap-4;
+  }
+  .grid {
+    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .grid article {
+    @apply rounded-archive bg-white p-5 shadow-sm;
   }
 }

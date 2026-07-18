@@ -47,6 +47,7 @@ export const postInputSchema = z
     seoDescriptionEn: z.string().max(320).nullable().optional(),
     version: z.string().datetime().optional(),
     categoryIds: z.array(z.string().uuid()).max(20).default([]),
+    mediaIds: z.array(z.string().uuid()).max(50).default([]),
   })
   .superRefine((data, ctx) => {
     if (data.isEnPublished && (!data.titleEn || !data.bodyMdEn))
@@ -57,6 +58,67 @@ export const postInputSchema = z
       });
   });
 export type PostInput = z.infer<typeof postInputSchema>;
+const translatedPublication = z
+  .object({
+    slug: slugSchema,
+    titleUk: z.string().trim().min(1).max(250),
+    titleEn: z.string().trim().max(250).nullable().optional(),
+    bodyMdUk: z.string().min(1),
+    bodyMdEn: z.string().nullable().optional(),
+    status: z.enum(statuses).default('draft'),
+    isEnPublished: z.boolean().default(false),
+    version: z.string().datetime().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.isEnPublished && (!data.titleEn || !data.bodyMdEn))
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Для англійської публікації потрібні title і body',
+        path: ['isEnPublished'],
+      });
+  });
+export const pageInputSchema = translatedPublication.extend({
+  template: z.enum(['default', 'about', 'contact']).default('default'),
+  showInMenu: z.boolean().default(false),
+  menuOrder: z.number().int().min(0).max(10000).default(0),
+  seoTitleUk: z.string().max(250).nullable().optional(),
+  seoTitleEn: z.string().max(250).nullable().optional(),
+  seoDescriptionUk: z.string().max(320).nullable().optional(),
+  seoDescriptionEn: z.string().max(320).nullable().optional(),
+});
+export const categoryInputSchema = z.object({
+  slug: slugSchema,
+  parentId: z.string().uuid().nullable().optional(),
+  titleUk: z.string().trim().min(1).max(250),
+  titleEn: z.string().trim().max(250).nullable().optional(),
+  descriptionMdUk: z.string().nullable().optional(),
+  descriptionMdEn: z.string().nullable().optional(),
+  status: z.enum(statuses).default('draft'),
+  isEnPublished: z.boolean().default(false),
+  showInMenu: z.boolean().default(false),
+  menuOrder: z.number().int().min(0).max(10000).default(0),
+  version: z.string().datetime().optional(),
+});
+export const mediaUpdateSchema = z.object({
+  altUk: z.string().trim().min(1).max(500),
+  altEn: z.string().trim().max(500).nullable().optional(),
+  captionUk: z.string().max(2000).nullable().optional(),
+  captionEn: z.string().max(2000).nullable().optional(),
+  credit: z.string().max(500).nullable().optional(),
+  license: z.string().max(500).nullable().optional(),
+  sourceUrl: z.string().url().max(2048).nullable().optional(),
+  version: z.string().datetime(),
+});
+export const userInputSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(320),
+  name: z.string().trim().min(1).max(120),
+  role: z.enum(roles),
+  isActive: z.boolean().default(true),
+});
+export const settingInputSchema = z.object({
+  key: z.enum(['site', 'home']),
+  value: z.record(z.string(), z.unknown()),
+});
 export const apiError = (code: string, message: string, fields?: Record<string, string>) => ({
   ok: false as const,
   error: { code, message, ...(fields ? { fields } : {}) },

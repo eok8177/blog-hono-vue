@@ -13,6 +13,7 @@ const posts = useQuery({
     }>(`/posts?q=${encodeURIComponent(q.value)}`),
 });
 const data = computed(() => posts.data.value);
+const isLoading = computed(() => posts.isPending.value);
 </script>
 <template>
   <section>
@@ -21,7 +22,7 @@ const data = computed(() => posts.data.value);
       <RouterLink class="button" to="/posts/new">Створити</RouterLink>
     </div>
     <label>Пошук <input v-model="q" /></label>
-    <p v-if="posts.isPending">Завантаження…</p>
+    <p v-if="isLoading">Завантаження…</p>
     <table v-else-if="data">
       <thead>
         <tr>

@@ -22,9 +22,9 @@ export async function savePost(env: Bindings, actor: Actor, id: string | undefin
   void db;
   const timestamp = now();
   const existing = id
-    ? await env.DB.prepare('SELECT updated_at FROM posts WHERE id=?')
+    ? await env.DB.prepare('SELECT updated_at,slug FROM posts WHERE id=?')
         .bind(id)
-        .first<{ updated_at: string }>()
+        .first<{ updated_at: string; slug: string }>()
     : null;
   if (id && !existing) return { kind: 'missing' as const };
   if (existing && data.version && data.version !== existing.updated_at)
@@ -84,6 +84,55 @@ export async function savePost(env: Bindings, actor: Actor, id: string | undefin
       'INSERT INTO post_categories(post_id,category_id,created_at) VALUES(?,?,?)',
     ).bind(postId, categoryId, timestamp),
   );
-  await env.DB.batch([statement, categoryDeletes, ...categoryInserts]);
+  const mediaDeletes = env.DB.prepare('DELETE FROM post_media WHERE post_id=?').bind(postId);
+  const mediaInserts = data.mediaIds.map((mediaId, position) =>
+    env.DB.prepare('INSERT INTO post_media(post_id,media_id,role,position) VALUES(?,?,?,?)').bind(
+      postId,
+      mediaId,
+      'gallery',
+      position,
+    ),
+  );
+  const redirects =
+    existing && existing.slug !== data.slug
+      ? [
+          // Point all prior aliases straight at the new canonical path, then add the just-replaced slug.
+          env.DB.prepare(
+            "UPDATE redirects SET new_path=? WHERE entity_type='post' AND entity_id=?",
+          ).bind(`/post/${data.slug}`, postId),
+          env.DB.prepare('DELETE FROM redirects WHERE old_path=?').bind(`/post/${data.slug}`),
+          env.DB.prepare(
+            'INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?)',
+          ).bind(
+            crypto.randomUUID(),
+            `/post/${existing.slug}`,
+            `/post/${data.slug}`,
+            301,
+            'post',
+            postId,
+            timestamp,
+          ),
+        ]
+      : [];
+  const audit = env.DB.prepare(
+    'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
+  ).bind(
+    crypto.randomUUID(),
+    actor.id,
+    id ? 'post.update' : 'post.create',
+    'post',
+    postId,
+    JSON.stringify({ slug: data.slug, status: data.status, englishPublished: data.isEnPublished }),
+    timestamp,
+  );
+  await env.DB.batch([
+    statement,
+    categoryDeletes,
+    ...categoryInserts,
+    mediaDeletes,
+    ...mediaInserts,
+    ...redirects,
+    audit,
+  ]);
   return { kind: 'ok' as const, id: postId };
 }
