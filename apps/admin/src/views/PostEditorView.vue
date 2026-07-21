@@ -157,16 +157,21 @@ async function save() {
     <form v-else class="admin-editor-form" @submit.prevent="save">
       <p v-if="error" role="alert">{{ error }}</p>
       <label>Slug <input v-model="form.slug" required pattern="[a-z0-9-]+" /></label>
-      <label>Український заголовок <input v-model="form.titleUk" required /></label>
-      <label>Короткий вступ <textarea v-model="form.excerptUk" rows="3" /></label>
-      <label class="admin-editor-label">Український текст <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk" /></label>
-      <fieldset>
-        <legend>English</legend>
-        <label>Title <input v-model="form.titleEn" /></label>
-        <label>Excerpt <textarea v-model="form.excerptEn" rows="3" /></label>
-        <label class="admin-editor-label">Body <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn" /></label>
-        <label><input v-model="form.isEnPublished" type="checkbox" /> Опублікувати English</label>
-      </fieldset>
+      <div class="admin-editor-columns">
+        <label>Український заголовок <input v-model="form.titleUk" required /></label
+        ><label>English title <input v-model="form.titleEn" /></label>
+      </div>
+      <div class="admin-editor-columns">
+        <label>Короткий вступ <textarea v-model="form.excerptUk" rows="3" /></label
+        ><label>English excerpt <textarea v-model="form.excerptEn" rows="3" /></label>
+      </div>
+      <div class="admin-editor-columns">
+        <label class="admin-editor-label">Український текст <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk" /></label
+        ><label class="admin-editor-label">English body <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn" /></label>
+      </div>
+      <label class="admin-checkbox"
+        ><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label
+      >
       <fieldset>
         <legend>Категорії</legend>
         <p v-if="!availableCategories.length">Категорій ще немає.</p>

@@ -149,7 +149,7 @@
     @apply text-sm font-medium text-slate-500 no-underline hover:text-brand-600;
   }
   .admin-content {
-    @apply mx-auto w-full max-w-360 p-4 sm:p-6 lg:p-8;
+    @apply mx-auto w-full p-4;
   }
   .admin-empty-page {
     @apply mx-auto max-w-2xl pt-8;
