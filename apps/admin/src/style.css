@@ -520,6 +520,15 @@
   .admin-gallery-name {
     @apply truncate px-3 py-2 text-xs font-medium text-slate-700;
   }
+  .admin-editor-label {
+    @apply m-0 max-w-none;
+  }
+  .milkdown-editor-host {
+    @apply mt-2 rounded-lg border border-slate-200 bg-white;
+  }
+  .milkdown-editor-host .milkdown {
+    @apply min-h-64;
+  }
 }
 
 :root[data-theme='dark'] {
@@ -759,4 +768,14 @@
 }
 :root[data-theme='dark'] .admin-gallery-name {
   color: #d0d5dd;
+}
+
+:root[data-theme='dark'] .admin-editor-label .milkdown {
+  border-color: #475467;
+  background: #101828;
+}
+
+:root[data-theme='dark'] .milkdown-editor-host {
+  border-color: #475467;
+  background: #101828;
 }

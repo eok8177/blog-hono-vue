@@ -33,6 +33,18 @@ async function renderPage(c: Context<AppEnv>, locale: Locale) {
   const hasEnglish = Number(page.is_en_published) === 1;
   const menuItems = await readNavigation(c.env, locale);
 
+  const gallery = await c.env.DB.prepare(
+    `SELECT m.id,m.width,m.height,m.alt_${locale} alt,m.caption_${locale} caption FROM page_media pm JOIN media m ON m.id=pm.media_id WHERE pm.page_id=? AND m.status='ready' ORDER BY pm.position`,
+  )
+    .bind(String(page.id))
+    .all<{
+      id: string;
+      width: number;
+      height: number;
+      alt: string | null;
+      caption: string | null;
+    }>();
+
   return c.html(
     <Layout
       nonce={c.get('cspNonce')}
@@ -67,6 +79,25 @@ async function renderPage(c: Context<AppEnv>, locale: Locale) {
           <div class="post-body">
             <Markdown html={renderMarkdown(body)} />
           </div>
+          {gallery.results.length ? (
+            <section class="gallery" aria-label={locale === 'uk' ? 'Галерея' : 'Gallery'}>
+              <h2>{locale === 'uk' ? 'Галерея' : 'Gallery'}</h2>
+              <div class="gallery-grid">
+                {gallery.results.map((image) => (
+                  <figure key={image.id}>
+                    <img
+                      src={`/media/${image.id}/960`}
+                      alt={image.alt ?? ''}
+                      width={image.width}
+                      height={image.height}
+                      loading="lazy"
+                    />
+                    {image.caption ? <figcaption>{image.caption}</figcaption> : null}
+                  </figure>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </article>
       </div>
     </Layout>,

@@ -25,7 +25,12 @@ export async function listAdminPages(env: Bindings, pagination: Pagination, sear
 }
 
 export async function findAdminPage(env: Bindings, id: string) {
-  return env.DB.prepare('SELECT * FROM pages WHERE id=?').bind(id).first<Record<string, unknown>>();
+  const page = await env.DB.prepare('SELECT * FROM pages WHERE id=?').bind(id).first<Record<string, unknown>>();
+  if (!page) return null;
+  const media = await env.DB.prepare('SELECT media_id FROM page_media WHERE page_id=? ORDER BY position')
+    .bind(id)
+    .all<{ media_id: string }>();
+  return { ...page, mediaIds: media.results.map((r) => r.media_id) };
 }
 
 export async function createPage(
@@ -67,6 +72,20 @@ export async function createPage(
       timestamp,
     )
     .run();
+
+  // Sync page_media
+  if (data.mediaIds.length) {
+    const mediaStatements = data.mediaIds.map((mediaId: string, position: number) =>
+      env.DB.prepare('INSERT INTO page_media(page_id,media_id,role,position) VALUES(?,?,?,?)').bind(
+        id,
+        mediaId,
+        'gallery',
+        position,
+      ),
+    );
+    await env.DB.batch(mediaStatements);
+  }
+
   return { kind: 'ok', id };
 }
 
@@ -115,6 +134,18 @@ export async function updatePage(
       data.version,
     ),
   ];
+  // Sync page_media
+  changes.push(
+    env.DB.prepare(`DELETE FROM page_media WHERE page_id=? AND ${guard}`).bind(
+      pageId,
+      ...guardArgs,
+    ),
+    ...data.mediaIds.map((mediaId: string, position: number) =>
+      env.DB.prepare(
+        `INSERT INTO page_media(page_id,media_id,role,position) SELECT ?,?,?,? WHERE ${guard}`,
+      ).bind(pageId, mediaId, 'gallery', position, ...guardArgs),
+    ),
+  );
   changes.push(
     env.DB.prepare(
       `INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard}`,

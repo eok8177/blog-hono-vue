@@ -2,10 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, ApiError } from '../api/client';
+import MilkdownEditor from '../components/MilkdownEditor.vue';
 
 const route = useRoute();
 const router = useRouter();
 const id = typeof route.params.id === 'string' ? route.params.id : undefined;
+const bodyEditorUk = ref<{ getContent?: () => string }>();
+const bodyEditorEn = ref<{ getContent?: () => string }>();
 const form = reactive({
   slug: '',
   titleUk: '',
@@ -116,10 +119,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
 async function save() {
   saving.value = true;
   error.value = '';
+  // Safety: pull latest content from editors before serializing
   try {
     await api(id ? `/posts/${id}` : '/posts', {
       method: id ? 'PUT' : 'POST',
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        bodyMdUk: bodyEditorUk.value?.getContent?.() ?? form.bodyMdUk,
+        bodyMdEn: bodyEditorEn.value?.getContent?.() ?? form.bodyMdEn,
+      }),
     });
     dirty.value = false;
     await router.push('/posts');
@@ -151,12 +159,12 @@ async function save() {
       <label>Slug <input v-model="form.slug" required pattern="[a-z0-9-]+" /></label>
       <label>Український заголовок <input v-model="form.titleUk" required /></label>
       <label>Короткий вступ <textarea v-model="form.excerptUk" rows="3" /></label>
-      <label>Український текст <textarea v-model="form.bodyMdUk" required rows="12" /></label>
+      <label class="admin-editor-label">Український текст <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk" /></label>
       <fieldset>
         <legend>English</legend>
         <label>Title <input v-model="form.titleEn" /></label>
         <label>Excerpt <textarea v-model="form.excerptEn" rows="3" /></label>
-        <label>Body <textarea v-model="form.bodyMdEn" rows="8" /></label>
+        <label class="admin-editor-label">Body <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn" /></label>
         <label><input v-model="form.isEnPublished" type="checkbox" /> Опублікувати English</label>
       </fieldset>
       <fieldset>

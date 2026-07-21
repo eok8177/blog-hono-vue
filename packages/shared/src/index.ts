@@ -89,6 +89,7 @@ export const pageInputSchema = translatedPublication.extend({
   seoTitleEn: z.string().max(250).nullable().optional(),
   seoDescriptionUk: z.string().max(320).nullable().optional(),
   seoDescriptionEn: z.string().max(320).nullable().optional(),
+  mediaIds: z.array(z.string().uuid()).max(50).default([]),
 });
 export const categoryInputSchema = z
   .object({

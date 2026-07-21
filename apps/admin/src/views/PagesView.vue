@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { api, ApiError } from '../api/client';
+import MilkdownEditor from '../components/MilkdownEditor.vue';
 type Page = {
   id: string;
   slug: string;
@@ -32,6 +33,7 @@ const form = reactive({
   isEnPublished: false,
   showInMenu: false,
   menuOrder: 0,
+  mediaIds: [] as string[],
   version: undefined as number | undefined,
 });
 const pages = useQuery({
@@ -53,31 +55,78 @@ function reset() {
     isEnPublished: false,
     showInMenu: false,
     menuOrder: 0,
+    mediaIds: [],
     version: undefined,
   });
 }
-function edit(item: Page) {
+async function edit(item: Page) {
   selectedId.value = item.id;
   editing.value = true;
-  Object.assign(form, {
-    slug: item.slug,
-    template: item.template,
-    titleUk: item.title_uk,
-    titleEn: item.title_en ?? '',
-    bodyMdUk: item.body_md_uk,
-    bodyMdEn: item.body_md_en ?? '',
-    status: item.status,
-    isEnPublished: Boolean(item.is_en_published),
-    showInMenu: Boolean(item.show_in_menu),
-    menuOrder: item.menu_order,
-    version: item.revision,
-  });
+  try {
+    const full = await api<{ mediaIds: string[] }>(`/pages/${item.id}`);
+    Object.assign(form, {
+      slug: item.slug,
+      template: item.template,
+      titleUk: item.title_uk,
+      titleEn: item.title_en ?? '',
+      bodyMdUk: item.body_md_uk,
+      bodyMdEn: item.body_md_en ?? '',
+      status: item.status,
+      isEnPublished: Boolean(item.is_en_published),
+      showInMenu: Boolean(item.show_in_menu),
+      menuOrder: item.menu_order,
+      mediaIds: full.mediaIds ?? [],
+      version: item.revision,
+    });
+  } catch {
+    Object.assign(form, {
+      slug: item.slug,
+      template: item.template,
+      titleUk: item.title_uk,
+      titleEn: item.title_en ?? '',
+      bodyMdUk: item.body_md_uk,
+      bodyMdEn: item.body_md_en ?? '',
+      status: item.status,
+      isEnPublished: Boolean(item.is_en_published),
+      showInMenu: Boolean(item.show_in_menu),
+      menuOrder: item.menu_order,
+      mediaIds: [],
+      version: item.revision,
+    });
+  }
 }
+const bodyEditorUk = ref<{ getContent?: () => string }>();
+const bodyEditorEn = ref<{ getContent?: () => string }>();
+type Media = { id: string; alt_uk: string; folder: string; status: string };
+const availableMedia = ref<Media[]>([]);
+const galleryFolderFilter = ref('');
+const galleryFolders = computed(() => {
+  const folders = new Set(availableMedia.value.map((m) => m.folder).filter(Boolean));
+  return [...folders].sort();
+});
+const hasUnfoldered = computed(() => availableMedia.value.some((m) => !m.folder));
+const filteredGalleryMedia = computed(() => {
+  if (!galleryFolderFilter.value) return availableMedia.value;
+  if (galleryFolderFilter.value === '__nofolder__')
+    return availableMedia.value.filter((m) => !m.folder);
+  return availableMedia.value.filter((m) => m.folder === galleryFolderFilter.value);
+});
+
+onMounted(async () => {
+  try {
+    const media = await api<{ items: Media[] }>('/media');
+    availableMedia.value = media.items.filter((item) => item.status === 'ready');
+  } catch { /* media not critical */ }
+});
 const save = useMutation({
   mutationFn: () =>
     api<{ id: string }>(selectedId.value ? `/pages/${selectedId.value}` : '/pages', {
       method: selectedId.value ? 'PUT' : 'POST',
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        bodyMdUk: bodyEditorUk.value?.getContent?.() ?? form.bodyMdUk,
+        bodyMdEn: bodyEditorEn.value?.getContent?.() ?? form.bodyMdEn,
+      }),
     }),
   onSuccess: async () => {
     editing.value = false;
@@ -157,9 +206,67 @@ function statusLabel(status: string) {
         >
       </div>
       <div class="admin-editor-columns">
-        <label>Текст українською <textarea v-model="form.bodyMdUk" rows="12" required /></label
-        ><label>Text English <textarea v-model="form.bodyMdEn" rows="12" /></label>
+        <label class="admin-editor-label">Текст українською <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk" /></label
+        ><label class="admin-editor-label">Text English <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn" /></label>
       </div>
+      <fieldset>
+        <legend>Галерея</legend>
+        <p v-if="!availableMedia.length">Спочатку завантажте зображення в Медіатеці.</p>
+        <template v-else>
+          <div class="admin-gallery-toolbar">
+            <button
+              type="button"
+              class="admin-gallery-tab"
+              :class="{ 'admin-gallery-tab-active': !galleryFolderFilter }"
+              @click="galleryFolderFilter = ''"
+            >
+              Усі
+            </button>
+            <button
+              v-for="f in galleryFolders"
+              :key="f"
+              type="button"
+              class="admin-gallery-tab"
+              :class="{ 'admin-gallery-tab-active': galleryFolderFilter === f }"
+              @click="galleryFolderFilter = f"
+            >
+              {{ f }}
+            </button>
+            <button
+              v-if="hasUnfoldered"
+              type="button"
+              class="admin-gallery-tab"
+              :class="{ 'admin-gallery-tab-active': galleryFolderFilter === '__nofolder__' }"
+              @click="galleryFolderFilter = '__nofolder__'"
+            >
+              Без папки
+            </button>
+          </div>
+          <div class="admin-gallery-grid">
+            <label
+              v-for="media in filteredGalleryMedia"
+              :key="media.id"
+              class="admin-gallery-item"
+            >
+              <input
+                v-model="form.mediaIds"
+                type="checkbox"
+                :value="media.id"
+                class="admin-gallery-checkbox"
+              />
+              <img
+                :src="`/media/${media.id}/480`"
+                :alt="media.alt_uk"
+                width="240"
+                height="160"
+                loading="lazy"
+                class="admin-gallery-thumb"
+              />
+              <span class="admin-gallery-name">{{ media.alt_uk }}</span>
+            </label>
+          </div>
+        </template>
+      </fieldset>
       <div class="admin-form-actions">
         <label class="admin-checkbox"
           ><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label
