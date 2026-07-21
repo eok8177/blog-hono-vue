@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, ApiError } from '../api/client';
 
@@ -47,10 +47,24 @@ type StoredPost = {
   mediaIds: string[];
   categoryIds: string[];
 };
-type Media = { id: string; alt_uk: string; status: string };
+type Media = { id: string; alt_uk: string; folder: string; status: string };
 type Category = { id: string; title_uk: string; status: string };
 const availableMedia = ref<Media[]>([]);
 const availableCategories = ref<Category[]>([]);
+const galleryFolderFilter = ref('');
+const galleryFolders = computed(() => {
+  const folders = new Set(availableMedia.value.map((m) => m.folder).filter(Boolean));
+  return [...folders].sort();
+});
+const hasUnfoldered = computed(() =>
+  availableMedia.value.some((m) => !m.folder),
+);
+const filteredGalleryMedia = computed(() => {
+  if (!galleryFolderFilter.value) return availableMedia.value;
+  if (galleryFolderFilter.value === '__nofolder__')
+    return availableMedia.value.filter((m) => !m.folder);
+  return availableMedia.value.filter((m) => m.folder === galleryFolderFilter.value);
+});
 
 onMounted(async () => {
   try {
@@ -163,10 +177,60 @@ async function save() {
       <fieldset>
         <legend>Галерея</legend>
         <p v-if="!availableMedia.length">Спочатку завантажте зображення в Медіатеці.</p>
-        <label v-for="media in availableMedia" :key="media.id"
-          ><input v-model="form.mediaIds" type="checkbox" :value="media.id" />
-          {{ media.alt_uk }}</label
-        >
+        <template v-else>
+          <div class="admin-gallery-toolbar">
+            <button
+              type="button"
+              class="admin-gallery-tab"
+              :class="{ 'admin-gallery-tab-active': !galleryFolderFilter }"
+              @click="galleryFolderFilter = ''"
+            >
+              Усі
+            </button>
+            <button
+              v-for="f in galleryFolders"
+              :key="f"
+              type="button"
+              class="admin-gallery-tab"
+              :class="{ 'admin-gallery-tab-active': galleryFolderFilter === f }"
+              @click="galleryFolderFilter = f"
+            >
+              {{ f }}
+            </button>
+            <button
+              v-if="hasUnfoldered"
+              type="button"
+              class="admin-gallery-tab"
+              :class="{ 'admin-gallery-tab-active': galleryFolderFilter === '__nofolder__' }"
+              @click="galleryFolderFilter = '__nofolder__'"
+            >
+              Без папки
+            </button>
+          </div>
+          <div class="admin-gallery-grid">
+            <label
+              v-for="media in filteredGalleryMedia"
+              :key="media.id"
+              class="admin-gallery-item"
+            >
+              <input
+                v-model="form.mediaIds"
+                type="checkbox"
+                :value="media.id"
+                class="admin-gallery-checkbox"
+              />
+              <img
+                :src="`/media/${media.id}/480`"
+                :alt="media.alt_uk"
+                width="240"
+                height="160"
+                loading="lazy"
+                class="admin-gallery-thumb"
+              />
+              <span class="admin-gallery-name">{{ media.alt_uk }}</span>
+            </label>
+          </div>
+        </template>
       </fieldset>
       <label
         >Статус

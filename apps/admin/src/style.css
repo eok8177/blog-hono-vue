@@ -496,6 +496,30 @@
   .admin-media-card-selected {
     @apply ring-2 ring-brand-500;
   }
+  .admin-gallery-toolbar {
+    @apply mb-3 flex flex-wrap items-center gap-1.5;
+  }
+  .admin-gallery-tab {
+    @apply rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 shadow-none transition-colors hover:bg-slate-200 hover:text-slate-900;
+  }
+  .admin-gallery-tab-active {
+    @apply bg-brand-500 text-white hover:bg-brand-600 hover:text-white;
+  }
+  .admin-gallery-grid {
+    @apply grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+  .admin-gallery-item {
+    @apply relative m-0 flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-md;
+  }
+  .admin-gallery-checkbox {
+    @apply absolute left-2 top-2 z-10 mt-0 h-4 w-4 rounded;
+  }
+  .admin-gallery-thumb {
+    @apply aspect-3/2 w-full object-cover;
+  }
+  .admin-gallery-name {
+    @apply truncate px-3 py-2 text-xs font-medium text-slate-700;
+  }
 }
 
 :root[data-theme='dark'] {
@@ -711,4 +735,28 @@
 }
 :root[data-theme='dark'] .admin-inline-form {
   border-color: #344054;
+}
+
+:root[data-theme='dark'] .admin-gallery-tab {
+  background: #1d2939;
+  color: #98a2b3;
+}
+:root[data-theme='dark'] .admin-gallery-tab:hover {
+  background: #344054;
+  color: #f2f4f7;
+}
+:root[data-theme='dark'] .admin-gallery-tab-active {
+  background: #465fff;
+  color: #fff;
+}
+:root[data-theme='dark'] .admin-gallery-tab-active:hover {
+  background: #3641f5;
+  color: #fff;
+}
+:root[data-theme='dark'] .admin-gallery-item {
+  background: #182230;
+  border-color: #344054;
+}
+:root[data-theme='dark'] .admin-gallery-name {
+  color: #d0d5dd;
 }
