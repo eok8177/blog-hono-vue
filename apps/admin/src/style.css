@@ -457,6 +457,45 @@
   .admin-theme-toggle {
     @apply flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 p-0 text-base text-slate-600 shadow-none hover:bg-slate-200;
   }
+  .admin-folder-toolbar {
+    @apply mb-5 flex flex-wrap items-center justify-between gap-3;
+  }
+  .admin-folder-tabs {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .admin-folder-tab {
+    @apply rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 shadow-none transition-colors hover:bg-slate-200 hover:text-slate-900;
+  }
+  .admin-folder-tab-active {
+    @apply bg-brand-500 text-white hover:bg-brand-600 hover:text-white;
+  }
+  .admin-folder-badge {
+    @apply absolute left-2 top-2 rounded-md bg-slate-900/70 px-2 py-0.5 text-xs font-medium text-white;
+  }
+  .admin-inline-form {
+    @apply mb-4 flex flex-wrap items-end gap-3 border-dashed;
+  }
+  .admin-inline-label {
+    @apply m-0 flex-1;
+  }
+  .admin-upload-folder {
+    @apply m-0 min-w-40;
+  }
+  .admin-batch-bar {
+    @apply mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm;
+  }
+  .admin-batch-bar span {
+    @apply font-semibold text-brand-700;
+  }
+  .admin-inline-select {
+    @apply rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm;
+  }
+  .admin-select-all-bar {
+    @apply mb-3 px-1;
+  }
+  .admin-media-card-selected {
+    @apply ring-2 ring-brand-500;
+  }
 }
 
 :root[data-theme='dark'] {
@@ -640,4 +679,36 @@
 :root[data-theme='dark'] code {
   background: #1d2939;
   color: #d0d5dd;
+}
+
+:root[data-theme='dark'] .admin-folder-tab {
+  background: #1d2939;
+  color: #98a2b3;
+}
+:root[data-theme='dark'] .admin-folder-tab:hover {
+  background: #344054;
+  color: #f2f4f7;
+}
+:root[data-theme='dark'] .admin-folder-tab-active {
+  background: #465fff;
+  color: #fff;
+}
+:root[data-theme='dark'] .admin-folder-tab-active:hover {
+  background: #3641f5;
+  color: #fff;
+}
+:root[data-theme='dark'] .admin-batch-bar {
+  background: #1e2a5e;
+  border-color: #3641f5;
+}
+:root[data-theme='dark'] .admin-batch-bar span {
+  color: #aab4ff;
+}
+:root[data-theme='dark'] .admin-inline-select {
+  background: #101828;
+  border-color: #475467;
+  color: #e4e7ec;
+}
+:root[data-theme='dark'] .admin-inline-form {
+  border-color: #344054;
 }

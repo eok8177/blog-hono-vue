@@ -112,6 +112,10 @@ export const categoryInputSchema = z
         path: ['isEnPublished'],
       });
   });
+const optionalUrl = z.preprocess(
+  (value) => (value === '' ? null : value),
+  z.string().url().max(2048).nullable().optional(),
+);
 export const mediaUpdateSchema = z.object({
   altUk: z.string().trim().min(1).max(500),
   altEn: z.string().trim().max(500).nullable().optional(),
@@ -119,8 +123,13 @@ export const mediaUpdateSchema = z.object({
   captionEn: z.string().max(2000).nullable().optional(),
   credit: z.string().max(500).nullable().optional(),
   license: z.string().max(500).nullable().optional(),
-  sourceUrl: z.string().url().max(2048).nullable().optional(),
+  sourceUrl: optionalUrl,
+  folder: z.string().trim().max(200).optional(),
   version: z.string().datetime(),
+});
+export const mediaBatchMoveSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+  folder: z.string().trim().max(200),
 });
 export const userInputSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(320),

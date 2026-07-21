@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { apiError, apiSuccess, mediaUpdateSchema, paginationSchema } from '@fauna/shared';
+import { apiError, apiSuccess, mediaBatchMoveSchema, mediaUpdateSchema, paginationSchema } from '@fauna/shared';
 import type { AppEnv } from '../../index';
 import { requireAdmin } from '../../middleware/auth';
 import { inspectImage, sha256 } from '../../utils/media';
@@ -8,13 +8,21 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
   app.get('/api/admin/media', async (c) => {
     const pagination = paginationSchema.parse(c.req.query());
     const search = (c.req.query('q') ?? '').slice(0, 100);
-    const where = search
-      ? 'WHERE alt_uk LIKE ? OR alt_en LIKE ? OR caption_uk LIKE ? OR caption_en LIKE ?'
-      : '';
-    const args = search ? Array(4).fill(`%${search}%`) : [];
+    const folder = (c.req.query('folder') ?? '').slice(0, 200);
+    const conditions: string[] = [];
+    const args: (string | number)[] = [];
+    if (search) {
+      conditions.push('(alt_uk LIKE ? OR alt_en LIKE ? OR caption_uk LIKE ? OR caption_en LIKE ?)');
+      args.push(...Array(4).fill(`%${search}%`));
+    }
+    if (folder) {
+      conditions.push('folder = ?');
+      args.push(folder);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const results = await c.env.DB.batch([
       c.env.DB.prepare(
-        `SELECT id,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,alt_uk,alt_en,caption_uk,caption_en,credit,license,status,created_at,updated_at FROM media ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        `SELECT id,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,alt_uk,alt_en,caption_uk,caption_en,credit,license,folder,status,created_at,updated_at FROM media ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       ).bind(...args, pagination.pageSize, (pagination.page - 1) * pagination.pageSize),
       c.env.DB.prepare(`SELECT count(*) count FROM media ${where}`).bind(...args),
     ]);
@@ -28,6 +36,13 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
     );
   });
 
+  app.get('/api/admin/media/folders', async (c) => {
+    const result = await c.env.DB.prepare(
+      "SELECT folder FROM media WHERE folder != '' GROUP BY folder ORDER BY folder ASC",
+    ).all<{ folder: string }>();
+    return c.json(apiSuccess({ folders: result.results.map((r) => r.folder) }));
+  });
+
   app.get('/api/admin/media/:id', async (c) => {
     const row = await c.env.DB.prepare('SELECT * FROM media WHERE id=?')
       .bind(c.req.param('id'))
@@ -39,7 +54,7 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
     const data = mediaUpdateSchema.parse(await c.req.json());
     const timestamp = new Date().toISOString();
     const result = await c.env.DB.prepare(
-      'UPDATE media SET alt_uk=?,alt_en=?,caption_uk=?,caption_en=?,credit=?,license=?,source_url=?,updated_at=? WHERE id=? AND updated_at=?',
+      'UPDATE media SET alt_uk=?,alt_en=?,caption_uk=?,caption_en=?,credit=?,license=?,source_url=?,folder=?,updated_at=? WHERE id=? AND updated_at=?',
     )
       .bind(
         data.altUk,
@@ -49,6 +64,7 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
         data.credit ?? null,
         data.license ?? null,
         data.sourceUrl ?? null,
+        data.folder ?? null,
         timestamp,
         c.req.param('id'),
         data.version,
@@ -57,6 +73,18 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
     return result.meta.changes
       ? c.json(apiSuccess({ id: c.req.param('id'), updatedAt: timestamp }))
       : c.json(apiError('CONFLICT', 'Файл змінився або не існує'), 409);
+  });
+
+  app.patch('/api/admin/media/batch/move', async (c) => {
+    const data = mediaBatchMoveSchema.parse(await c.req.json());
+    const timestamp = new Date().toISOString();
+    const placeholders = data.ids.map(() => '?').join(',');
+    const result = await c.env.DB.prepare(
+      `UPDATE media SET folder=?,updated_at=? WHERE id IN (${placeholders})`,
+    )
+      .bind(data.folder, timestamp, ...data.ids)
+      .run();
+    return c.json(apiSuccess({ moved: result.meta.changes }));
   });
 
   app.use('/api/admin/media/:id', requireAdmin);
@@ -204,9 +232,10 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
       );
       const id = crypto.randomUUID();
       const timestamp = new Date().toISOString();
+      const folder = typeof form.get('folder') === 'string' ? String(form.get('folder')).trim().slice(0, 200) : '';
       const largest = inspected[2]!;
       await c.env.DB.prepare(
-        'INSERT INTO media(id,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,sha256,alt_uk,alt_en,caption_uk,caption_en,credit,license,source_url,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO media(id,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,sha256,alt_uk,alt_en,caption_uk,caption_en,credit,license,source_url,folder,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       )
         .bind(
           id,
@@ -225,6 +254,7 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
           typeof form.get('credit') === 'string' ? String(form.get('credit')) : null,
           typeof form.get('license') === 'string' ? String(form.get('license')) : null,
           typeof form.get('sourceUrl') === 'string' ? String(form.get('sourceUrl')) : null,
+          folder,
           'ready',
           c.get('actor').id,
           timestamp,

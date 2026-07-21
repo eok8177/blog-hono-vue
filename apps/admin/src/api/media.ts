@@ -29,10 +29,11 @@ export async function webpVariants(
     source.close();
   }
 }
-export async function uploadMedia(file: File, altUk: string) {
+export async function uploadMedia(file: File, altUk: string, folder = '') {
   const variants = await webpVariants(file);
   const form = new FormData();
   form.set('altUk', altUk);
+  if (folder) form.set('folder', folder);
   form.set('variant480', variants.variant480, 'variant-480.webp');
   form.set('variant960', variants.variant960, 'variant-960.webp');
   form.set('variant1600', variants.variant1600, 'variant-1600.webp');
