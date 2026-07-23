@@ -47,13 +47,13 @@ export const inlineScript = () => /* javascript */ `
   if (navToggle && navMenu) {
     function openNav() {
       navToggle.setAttribute('aria-expanded', 'true');
-      navMenu.classList.add('is-open');
+      doc.body.classList.add('nav-open');
       lockScroll();
       doc.addEventListener('keydown', onNavKey);
     }
     function closeNav() {
       navToggle.setAttribute('aria-expanded', 'false');
-      navMenu.classList.remove('is-open');
+      doc.body.classList.remove('nav-open');
       unlockScroll();
       doc.removeEventListener('keydown', onNavKey);
     }
@@ -62,7 +62,7 @@ export const inlineScript = () => /* javascript */ `
     }
     navToggle.addEventListener('click', function(e) {
       e.stopPropagation();
-      if (navMenu.classList.contains('is-open')) { closeNav(); }
+      if (doc.body.classList.contains('nav-open')) { closeNav(); }
       else { openNav(); }
     });
     navMenu.addEventListener('click', function(e) {

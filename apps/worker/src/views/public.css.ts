@@ -482,7 +482,7 @@ export const publicCss = String.raw`
       visibility: hidden;
       transition: visibility .35s;
     }
-    .nav-menu.is-open {
+    body.nav-open .nav-menu {
       visibility: visible;
       overflow: visible;
     }
@@ -495,8 +495,14 @@ export const publicCss = String.raw`
       opacity: 0;
       transition: opacity .35s ease;
     }
-    .nav-menu.is-open::before {
+    body.nav-open .nav-menu::before {
       opacity: 1;
+    }
+
+    /* prevent backdrop-filter on header from trapping fixed .nav-menu (Safari) */
+    body.nav-open .site-header {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
 
     .nav-menu-panel {
@@ -516,7 +522,7 @@ export const publicCss = String.raw`
       transition: transform .35s cubic-bezier(.4,0,.2,1);
       overflow-y: auto;
     }
-    .nav-menu.is-open .nav-menu-panel {
+    body.nav-open .nav-menu-panel {
       transform: translateX(0);
     }
 
