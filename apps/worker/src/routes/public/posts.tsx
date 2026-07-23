@@ -36,8 +36,10 @@ async function renderPost(c: Context<AppEnv>, locale: Locale) {
   const body = String(post[locale === 'en' ? 'body_md_en' : 'body_md_uk']);
   const base = siteUrl(c.env);
   const slug = c.req.param('slug') ?? '';
-  const ukHref = `${base}/post/${slug}`;
-  const enHref = `${base}/en/post/${slug}`;
+  const ukPath = `/post/${slug}`;
+  const enPath = `/en/post/${slug}`;
+  const ukHref = `${base}${ukPath}`;
+  const enHref = `${base}${enPath}`;
   const hasEnglish = Number(post.is_en_published) === 1;
   const menuItems = await readNavigation(c.env, locale);
 
@@ -49,7 +51,7 @@ async function renderPost(c: Context<AppEnv>, locale: Locale) {
       description={String(post[locale === 'en' ? 'excerpt_en' : 'excerpt_uk'] ?? '')}
       canonical={locale === 'en' ? enHref : ukHref}
       menuItems={menuItems}
-      languageHref={locale === 'en' ? ukHref : hasEnglish ? enHref : '/en/'}
+      languageHref={locale === 'en' ? ukPath : hasEnglish ? enPath : '/en/'}
       jsonLd={{
         '@context': 'https://schema.org',
         '@type': 'Article',

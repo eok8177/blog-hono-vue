@@ -80,7 +80,8 @@ export const Layout: FC<{
         <script nonce={nonce}>
           {raw(`
             ;(function(){
-              var t = localStorage.getItem('theme');
+              var t = null;
+              try { t = localStorage.getItem('theme'); } catch(e) {}
               if (t === 'dark' || t === 'light') {
                 document.documentElement.setAttribute('data-theme', t);
               } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -113,7 +114,7 @@ export const Layout: FC<{
               </span>
             </a>
             <div class="nav-group">
-              <div class="nav-menu" id="nav-menu" aria-hidden="true">
+              <div class="nav-menu" id="nav-menu">
                 <div class="nav-menu-panel">
                   {menuItems.map((item) => (
                     <a class="nav-menu-link" href={item.href}>{item.label}</a>
@@ -137,6 +138,7 @@ export const Layout: FC<{
                   class="nav-toggle"
                   id="nav-toggle"
                   type="button"
+                  aria-controls="nav-menu"
                   aria-expanded="false"
                   aria-label={lang === 'uk' ? 'Меню' : 'Menu'}
                 >
@@ -167,19 +169,21 @@ export const Layout: FC<{
           id="lightbox"
           aria-hidden="true"
           role="dialog"
+          aria-modal="true"
           aria-label={lang === 'uk' ? 'Перегляд зображень' : 'Image viewer'}
+          tabIndex={-1}
         >
           <div class="lightbox-backdrop" data-lightbox-close />
           <div class="lightbox-stage">
             <div class="lightbox-track" id="lightbox-track" />
           </div>
-          <button class="lightbox-btn lightbox-close" data-lightbox-close aria-label={lang === 'uk' ? 'Закрити' : 'Close'}>
+          <button class="lightbox-btn lightbox-close" type="button" data-lightbox-close aria-label={lang === 'uk' ? 'Закрити' : 'Close'}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
-          <button class="lightbox-btn lightbox-prev" id="lightbox-prev" aria-label={lang === 'uk' ? 'Попереднє' : 'Previous'}>
+          <button class="lightbox-btn lightbox-prev" type="button" id="lightbox-prev" aria-label={lang === 'uk' ? 'Попереднє' : 'Previous'}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <button class="lightbox-btn lightbox-next" id="lightbox-next" aria-label={lang === 'uk' ? 'Наступне' : 'Next'}>
+          <button class="lightbox-btn lightbox-next" type="button" id="lightbox-next" aria-label={lang === 'uk' ? 'Наступне' : 'Next'}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
           <div class="lightbox-counter" id="lightbox-counter" />
@@ -192,6 +196,17 @@ export const Layout: FC<{
               var html = doc.documentElement;
 
               /* ── Reading progress ── */
+              var scrollLockCount = 0;
+              var previousOverflow = '';
+              function lockScroll() {
+                if (scrollLockCount++ === 0) previousOverflow = html.style.overflow;
+                html.style.overflow = 'hidden';
+              }
+              function unlockScroll() {
+                scrollLockCount = Math.max(0, scrollLockCount - 1);
+                if (!scrollLockCount) html.style.overflow = previousOverflow;
+              }
+
               var bar = doc.querySelector('.reading-progress');
               var ticking = false;
               if (bar) {
@@ -199,8 +214,8 @@ export const Layout: FC<{
                   var el = doc.scrollingElement || html;
                   var st = el.scrollTop;
                   var sh = el.scrollHeight - el.clientHeight;
-                  var pct = sh <= 0 ? 0 : Math.min(100, Math.round((st / sh) * 1000) / 10);
-                  html.style.setProperty('--reading-progress', pct + '%');
+                  var pct = sh <= 0 ? 0 : Math.min(1, st / sh);
+                  html.style.setProperty('--reading-progress', pct);
                 }
                 window.addEventListener('scroll', function(){
                   if (!ticking) { requestAnimationFrame(function(){ updateProgress(); ticking = false; }); ticking = true; }
@@ -224,16 +239,14 @@ export const Layout: FC<{
               if (navToggle && navMenu) {
                 function openNav() {
                   navToggle.setAttribute('aria-expanded', 'true');
-                  navMenu.setAttribute('aria-hidden', 'false');
                   navMenu.classList.add('is-open');
-                  html.style.overflow = 'hidden';
+                  lockScroll();
                   doc.addEventListener('keydown', onNavKey);
                 }
                 function closeNav() {
                   navToggle.setAttribute('aria-expanded', 'false');
-                  navMenu.setAttribute('aria-hidden', 'true');
                   navMenu.classList.remove('is-open');
-                  html.style.overflow = '';
+                  unlockScroll();
                   doc.removeEventListener('keydown', onNavKey);
                 }
                 function onNavKey(e) {
@@ -245,7 +258,8 @@ export const Layout: FC<{
                   else { openNav(); }
                 });
                 navMenu.addEventListener('click', function(e) {
-                  if (e.target === navMenu || e.target.closest('.nav-menu-link')) {
+                  var target = e.target;
+                  if (target === navMenu || target instanceof Element && target.closest('.nav-menu-link')) {
                     closeNav();
                   }
                 });
@@ -256,42 +270,61 @@ export const Layout: FC<{
               var lbTrack = doc.getElementById('lightbox-track');
               var lbCounter = doc.getElementById('lightbox-counter');
               var lbCaption = doc.getElementById('lightbox-caption');
+              var lbPrev = doc.getElementById('lightbox-prev');
+              var lbNext = doc.getElementById('lightbox-next');
               var slides = [];
               var currentIdx = 0;
               var touchStartX = 0;
               var touchCurrentX = 0;
               var dragging = false;
               var animating = false;
+              var transitionMs = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350;
+              var slideEls = [];
+              var galleryImages = [];
+              var previousFocus = null;
 
               function buildSlides() {
                 slides = [];
-                var figs = doc.querySelectorAll('.gallery figure');
-                figs.forEach(function(fig) {
-                  var img = fig.querySelector('img');
-                  var cap = fig.querySelector('figcaption');
-                  if (!img) return;
+                galleryImages = Array.from(doc.querySelectorAll('.gallery img'));
+                galleryImages.forEach(function(img) {
+                  var fig = img.closest('figure');
+                  var cap = fig ? fig.querySelector('figcaption') : null;
                   var src = img.getAttribute('src') || '';
-                  var fullSrc = src.replace(/\\/960$/, '/1600');
-                  var alt = img.getAttribute('alt') || '';
-                  var caption = cap ? cap.textContent : '';
-                  slides.push({ src: fullSrc, alt: alt, caption: caption });
+                  slides.push({
+                    src: src.replace(/\\/960$/, '/1600'),
+                    alt: img.getAttribute('alt') || '',
+                    caption: cap ? cap.textContent : ''
+                  });
                 });
               }
 
               function renderSlides() {
                 if (!lbTrack) return;
                 lbTrack.innerHTML = '';
-                slides.forEach(function(s, i) {
+                slideEls = slides.map(function(s, i) {
                   var slide = doc.createElement('div');
                   slide.className = 'lightbox-slide';
-                  slide.setAttribute('aria-hidden', i === currentIdx ? 'false' : 'true');
                   var img = doc.createElement('img');
-                  img.src = i === currentIdx || i === currentIdx - 1 || i === currentIdx + 1 ? s.src : '';
                   img.setAttribute('data-src', s.src);
                   img.alt = s.alt;
-                  img.loading = 'lazy';
+                  img.decoding = 'async';
+                  img.loading = i === currentIdx ? 'eager' : 'lazy';
                   slide.appendChild(img);
                   lbTrack.appendChild(slide);
+                  return { slide: slide, img: img };
+                });
+                updateRenderedSlides();
+              }
+
+              function updateRenderedSlides() {
+                slideEls.forEach(function(item, i) {
+                  var nearby = Math.abs(i - currentIdx) <= 1;
+                  item.slide.setAttribute('aria-hidden', i === currentIdx ? 'false' : 'true');
+                  if (nearby && !item.img.getAttribute('src')) {
+                    item.img.src = item.img.getAttribute('data-src') || '';
+                  } else if (!nearby) {
+                    item.img.removeAttribute('src');
+                  }
                 });
               }
 
@@ -299,11 +332,11 @@ export const Layout: FC<{
                 if (idx < 0 || idx >= slides.length || animating) return;
                 animating = true;
                 currentIdx = idx;
-                renderSlides();
+                updateRenderedSlides();
                 lbTrack.style.transform = 'translateX(-' + (idx * 100) + '%)';
                 updateCounter();
                 updateButtons();
-                setTimeout(function(){ animating = false; }, 350);
+                setTimeout(function(){ animating = false; }, transitionMs);
               }
 
               function updateCounter() {
@@ -320,15 +353,20 @@ export const Layout: FC<{
               }
 
               function updateButtons() {
-                var prev = doc.getElementById('lightbox-prev');
-                var next = doc.getElementById('lightbox-next');
-                if (prev) prev.style.opacity = currentIdx === 0 ? '0.3' : '1';
-                if (next) next.style.opacity = currentIdx === slides.length - 1 ? '0.3' : '1';
+                var prev = lbPrev;
+                var next = lbNext;
+                if (prev) {
+                  prev.disabled = slides.length < 2 || currentIdx === 0;
+                  prev.hidden = slides.length < 2;
+                }
+                if (next) {
+                  next.disabled = slides.length < 2 || currentIdx === slides.length - 1;
+                  next.hidden = slides.length < 2;
+                }
               }
 
               function open(idx) {
                 if (!lb) return;
-                buildSlides();
                 if (!slides.length) return;
                 currentIdx = Math.max(0, Math.min(idx, slides.length - 1));
                 renderSlides();
@@ -336,12 +374,14 @@ export const Layout: FC<{
                 lbTrack.style.transform = 'translateX(-' + (currentIdx * 100) + '%)';
                 /* force reflow */
                 lbTrack.offsetHeight;
-                lbTrack.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)';
+                lbTrack.style.transition = 'transform ' + (transitionMs / 1000) + 's cubic-bezier(.4,0,.2,1)';
                 updateCounter();
                 updateButtons();
                 lb.setAttribute('aria-hidden', 'false');
                 lb.classList.add('is-open');
-                html.style.overflow = 'hidden';
+                previousFocus = doc.activeElement;
+                lockScroll();
+                lb.focus();
                 doc.addEventListener('keydown', onKey);
               }
 
@@ -349,14 +389,24 @@ export const Layout: FC<{
                 if (!lb) return;
                 lb.classList.remove('is-open');
                 lb.setAttribute('aria-hidden', 'true');
-                html.style.overflow = '';
+                unlockScroll();
                 doc.removeEventListener('keydown', onKey);
+                if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+                previousFocus = null;
               }
 
               function onKey(e) {
                 if (e.key === 'Escape') { close(); return; }
                 if (e.key === 'ArrowLeft') { goTo(currentIdx - 1); return; }
                 if (e.key === 'ArrowRight') { goTo(currentIdx + 1); return; }
+                if (e.key === 'Tab' && lb) {
+                  var focusable = Array.from(lb.querySelectorAll('button:not([hidden]):not([disabled])'));
+                  if (!focusable.length) { e.preventDefault(); return; }
+                  var first = focusable[0];
+                  var last = focusable[focusable.length - 1];
+                  if (e.shiftKey && doc.activeElement === first) { e.preventDefault(); last.focus(); }
+                  else if (!e.shiftKey && doc.activeElement === last) { e.preventDefault(); first.focus(); }
+                }
               }
 
               /* ── Touch / swipe ── */
@@ -383,7 +433,7 @@ export const Layout: FC<{
                 lbTrack.addEventListener('touchend', function() {
                   if (!dragging) return;
                   dragging = false;
-                  lbTrack.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)';
+                  lbTrack.style.transition = 'transform ' + (transitionMs / 1000) + 's cubic-bezier(.4,0,.2,1)';
                   var dx = touchCurrentX - touchStartX;
                   if (dx < -40) { goTo(currentIdx + 1); }
                   else if (dx > 40) { goTo(currentIdx - 1); }
@@ -394,13 +444,13 @@ export const Layout: FC<{
               /* ── Click handlers ── */
               doc.addEventListener('click', function(e) {
                 var target = e.target;
+                if (!(target instanceof Element)) return;
                 /* open: click on gallery image */
                 var galleryImg = target.closest('.gallery img');
                 if (galleryImg) {
                   e.preventDefault();
                   buildSlides();
-                  var idx = Array.from(doc.querySelectorAll('.gallery img')).indexOf(galleryImg);
-                  open(idx);
+                  open(galleryImages.indexOf(galleryImg));
                   return;
                 }
                 /* close: backdrop or close button */
@@ -411,8 +461,8 @@ export const Layout: FC<{
               });
 
               /* prev / next buttons */
-              var prevBtn = doc.getElementById('lightbox-prev');
-              var nextBtn = doc.getElementById('lightbox-next');
+              var prevBtn = lbPrev;
+              var nextBtn = lbNext;
               if (prevBtn) prevBtn.addEventListener('click', function(e) { e.stopPropagation(); goTo(currentIdx - 1); });
               if (nextBtn) nextBtn.addEventListener('click', function(e) { e.stopPropagation(); goTo(currentIdx + 1); });
 

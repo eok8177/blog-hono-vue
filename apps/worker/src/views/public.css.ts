@@ -6,7 +6,7 @@ export const publicCss = String.raw`
    UNLAYERED — must resolve across all layers
    ══════════════════════════════════════════════════ */
 :root {
-  --reading-progress: 0%;
+  --reading-progress: 0;
 }
 
 /* ══════════════════════════════════════════════════
@@ -131,6 +131,8 @@ export const publicCss = String.raw`
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }
+  html[data-theme="light"] { color-scheme: light; }
+  html[data-theme="dark"] { color-scheme: dark; }
 
   body {
     color: var(--fg);
@@ -268,9 +270,11 @@ export const publicCss = String.raw`
     content: "";
     display: block;
     height: 100%;
-    width: var(--reading-progress);
+    width: 100%;
     background: var(--accent);
-    transition: width .1s linear;
+    transform: scaleX(var(--reading-progress));
+    transform-origin: left;
+    transition: transform .1s linear;
   }
 
   /* ── Skip link ── */
@@ -1043,15 +1047,13 @@ export const publicCss = String.raw`
     background: var(--bg-muted);
     aspect-ratio: 3/2;
     object-fit: cover;
+    cursor: zoom-in;
+    transition: opacity .2s ease;
   }
   .gallery figcaption {
     padding-top: .5rem;
     color: var(--fg-muted);
     font-size: .85rem;
-  }
-  .gallery img {
-    cursor: zoom-in;
-    transition: opacity .2s ease;
   }
   .gallery img:hover { opacity: .85; }
 
@@ -1136,6 +1138,11 @@ export const publicCss = String.raw`
     -webkit-backdrop-filter: blur(6px);
   }
   .lightbox-btn:hover { background: oklch(100% 0 0 / .25); }
+  .lightbox-btn:disabled {
+    opacity: .3;
+    cursor: default;
+  }
+  .lightbox-btn:disabled:hover { background: oklch(100% 0 0 / .12); }
   .lightbox-close { top: 1rem; right: 1rem; }
   .lightbox-prev { left: .75rem; top: 50%; transform: translateY(-50%); }
   .lightbox-next { right: .75rem; top: 50%; transform: translateY(-50%); }

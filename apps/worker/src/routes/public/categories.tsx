@@ -33,9 +33,12 @@ async function renderCategory(c: Context<AppEnv>, locale: Locale) {
   ]);
   const basePath = locale === 'en' ? `/en/category/${slug}` : `/category/${slug}`;
   const suffix = pagination.page > 1 ? `?page=${pagination.page}` : '';
-  const canonical = `${siteUrl(c.env)}${basePath}${suffix}`;
-  const ukHref = `${siteUrl(c.env)}/category/${slug}${suffix}`;
-  const enHref = `${siteUrl(c.env)}/en/category/${slug}${suffix}`;
+  const base = siteUrl(c.env);
+  const ukPath = `/category/${slug}${suffix}`;
+  const enPath = `/en/category/${slug}${suffix}`;
+  const canonical = `${base}${basePath}${suffix}`;
+  const ukHref = `${base}${ukPath}`;
+  const enHref = `${base}${enPath}`;
   const hasEnglish = Number(category.is_en_published) === 1;
   const title = String(category[locale === 'en' ? 'title_en' : 'title_uk']);
   const menuItems = await readNavigation(c.env, locale);
@@ -57,7 +60,7 @@ async function renderCategory(c: Context<AppEnv>, locale: Locale) {
       )}
       canonical={canonical}
       menuItems={menuItems}
-      languageHref={locale === 'en' ? ukHref : hasEnglish ? enHref : '/en/'}
+      languageHref={locale === 'en' ? ukPath : hasEnglish ? enPath : '/en/'}
       alternates={
         locale === 'en' || hasEnglish
           ? [

@@ -28,8 +28,10 @@ async function renderPage(c: Context<AppEnv>, locale: Locale) {
   const body = String(page[locale === 'en' ? 'body_md_en' : 'body_md_uk']);
   const base = siteUrl(c.env);
   const slug = c.req.param('slug') ?? '';
-  const ukHref = `${base}/${slug}`;
-  const enHref = `${base}/en/${slug}`;
+  const ukPath = `/${slug}`;
+  const enPath = `/en/${slug}`;
+  const ukHref = `${base}${ukPath}`;
+  const enHref = `${base}${enPath}`;
   const hasEnglish = Number(page.is_en_published) === 1;
   const menuItems = await readNavigation(c.env, locale);
 
@@ -52,7 +54,7 @@ async function renderPage(c: Context<AppEnv>, locale: Locale) {
       title={title}
       canonical={locale === 'en' ? enHref : ukHref}
       menuItems={menuItems}
-      languageHref={locale === 'en' ? ukHref : hasEnglish ? enHref : '/en/'}
+      languageHref={locale === 'en' ? ukPath : hasEnglish ? enPath : '/en/'}
       alternates={
         locale === 'en' || hasEnglish
           ? [
