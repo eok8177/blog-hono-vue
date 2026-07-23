@@ -73,7 +73,7 @@ async function renderPost(c: Context<AppEnv>, locale: Locale) {
           : []
       }
     >
-      <div class="page-shell narrow">
+      <div class="content">
         <nav class="breadcrumb" aria-label={locale === 'uk' ? 'Навігація' : 'Breadcrumb'}>
           <a href={locale === 'en' ? '/en/' : '/'}>{locale === 'en' ? 'Archive' : 'Архів'}</a>
           <span aria-hidden="true"> / </span>

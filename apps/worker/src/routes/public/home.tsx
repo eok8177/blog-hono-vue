@@ -59,7 +59,7 @@ async function renderHome(c: Context<AppEnv>, locale: Locale) {
         </div>
       </section>
       <section class="section" aria-labelledby="recent-title">
-        <div class="shell">
+        <div class="container">
           <SectionLabel>{locale === 'en' ? 'The archive' : 'Архів'}</SectionLabel>
           <div class="section-heading">
             <h2 id="recent-title">
@@ -118,7 +118,7 @@ async function renderHome(c: Context<AppEnv>, locale: Locale) {
         </div>
       </section>
       <section class="section" aria-labelledby="categories-title">
-        <div class="shell archive-note">
+        <div class="container archive-note">
           <div>
             <p class="eyebrow">{locale === 'en' ? 'Ways into the archive' : 'Розділи архіву'}</p>
             <h2 id="categories-title">

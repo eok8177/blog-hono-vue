@@ -85,7 +85,7 @@ async function renderSearchPage(c: Context<AppEnv>, locale: Locale) {
       menuItems={menuItems}
       canonical={`${siteUrl(c.env)}${path}`}
     >
-      <div class="page-shell">
+      <div class="content">
         <p class="eyebrow">{locale === 'uk' ? 'Пошук в архіві' : 'Search the archive'}</p>
         <h1 class="page-title">
           {locale === 'uk' ? 'Знайти спостереження' : 'Find an observation'}
