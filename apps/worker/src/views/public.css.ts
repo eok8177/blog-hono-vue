@@ -1136,7 +1136,7 @@ export const publicCss = String.raw`
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: clamp(3rem, 8vw, 5rem);
+    padding: 3rem;
   }
   .lightbox-track {
     display: flex;
@@ -1152,7 +1152,6 @@ export const publicCss = String.raw`
     align-items: center;
     justify-content: center;
     height: 100%;
-    padding: 4rem 0 3rem;
   }
   .lightbox-slide img {
     max-width: 100%;
