@@ -1,6 +1,6 @@
 export const publicCss = String.raw`
 /* ── Layers ── */
-@layer reset, base, layout, components, utils, theme;
+@layer reset, theme, base, layout, components, utils;
 
 /* ══════════════════════════════════════════════════
    RESET
@@ -39,8 +39,11 @@ export const publicCss = String.raw`
     --bg-muted:       light-dark(oklch(95.5% 0.008 88),        oklch(25% 0.018 93));
     --fg:             light-dark(oklch(15% 0.01 90),           oklch(90% 0.01 95));
     --fg-muted:       light-dark(oklch(48% 0.02 85),           oklch(66% 0.025 90));
-    --accent:         light-dark(oklch(62% 0.16 80),           oklch(68% 0.16 80));
-    --accent-soft:    light-dark(oklch(72% 0.12 80),           oklch(58% 0.12 80));
+    /* Accent colors meet WCAG contrast for normal text on page backgrounds. */
+    --accent:         light-dark(oklch(55% 0.15 78),           oklch(72% 0.14 80));
+    --accent-hover:   light-dark(oklch(48% 0.14 78),           oklch(80% 0.11 80));
+    --accent-soft:    light-dark(oklch(72% 0.10 80),           oklch(58% 0.10 80));
+    --on-accent:      light-dark(oklch(100% 0 0),              oklch(16% 0.01 90));
     --border:         light-dark(oklch(90% 0.015 88),          oklch(30% 0.022 93));
     --border-light:   light-dark(oklch(93% 0.01 88),           oklch(26% 0.018 93));
 
@@ -59,6 +62,10 @@ export const publicCss = String.raw`
     --site-header-bg: light-dark(oklch(97.5% 0.006 90 / .82), oklch(19% 0.012 95 / .82));
 
     --reading-progress: 0;
+  }
+
+  @media (min-width: 700px) {
+    :root { --header-h: 72px; }
   }
 
   /* manual theme override — color-scheme flips light-dark() resolution */
@@ -186,6 +193,7 @@ export const publicCss = String.raw`
     margin: -1px;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
   }
@@ -260,7 +268,7 @@ export const publicCss = String.raw`
     z-index: 20;
     padding: .6rem 1.2rem;
     border-radius: var(--radius-sm);
-    color: #fff;
+    color: var(--bg);
     background: var(--fg);
     font-weight: 600;
     text-decoration: none;
@@ -326,7 +334,7 @@ export const publicCss = String.raw`
   }
   .wordmark:hover .wordmark-mark {
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
   .wordmark strong {
     display: block;
@@ -444,10 +452,21 @@ export const publicCss = String.raw`
     transition: color .2s ease;
     white-space: nowrap;
   }
-  .nav-menu-link:hover { color: var(--accent); }
+  .nav-menu-link:hover,
+  .nav-menu-link[aria-current="page"] {
+    color: var(--accent);
+  }
+
+  .nav-menu-link[aria-current="page"] {
+    text-decoration: underline;
+    text-decoration-color: var(--accent-soft);
+    text-underline-offset: .45em;
+  }
 
   /* mobile nav overlay */
   @media (max-width: 699px) {
+    body.nav-open { overflow: hidden; }
+
     .nav-menu {
       position: fixed;
       inset: 0;
@@ -748,12 +767,16 @@ export const publicCss = String.raw`
     transform-origin: left;
     transition: transform .3s ease;
   }
-  .card:hover {
+  .card:hover,
+  .card:focus-within {
     border-color: var(--accent-soft);
     box-shadow: var(--shadow-md);
     transform: translateY(-2px);
   }
-  .card:hover::before { transform: scaleX(1); }
+  .card:hover::before,
+  .card:focus-within::before {
+    transform: scaleX(1);
+  }
   .card .post-meta {
     margin-bottom: 1rem;
     color: var(--accent);
@@ -906,9 +929,10 @@ export const publicCss = String.raw`
   .markdown p  { margin-bottom: 1.5rem; }
   .markdown a  {
     color: var(--accent);
+    overflow-wrap: anywhere;
     text-underline-offset: .2em;
   }
-  .markdown a:hover { color: var(--accent-soft); }
+  .markdown a:hover { color: var(--accent-hover); }
   .markdown blockquote {
     margin: 2rem 0;
     padding: 1.2rem 1.5rem;
@@ -928,10 +952,9 @@ export const publicCss = String.raw`
   .markdown img {
     max-width: 100%;
     height: auto;
+    margin-inline: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    aspect-ratio: auto;
-    loading: lazy;
   }
   .markdown figure { margin-block: 2rem; }
   .markdown figcaption {
@@ -960,6 +983,8 @@ export const publicCss = String.raw`
     padding: 0;
     background: none;
     font-size: .85em;
+    overflow-wrap: normal;
+    white-space: pre;
   }
   .markdown hr {
     margin: 2.5rem 0;
@@ -1058,10 +1083,9 @@ export const publicCss = String.raw`
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--bg-muted);
-    aspect-ratio: 3/2;
+    aspect-ratio: 3 / 2;
     object-fit: cover;
     cursor: zoom-in;
-    loading: lazy;
     transition: opacity .2s ease;
   }
   .gallery figcaption {
@@ -1081,12 +1105,22 @@ export const publicCss = String.raw`
     justify-content: center;
     background: oklch(0% 0 0 / .92);
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
-    transition: opacity .3s ease;
+    transition:
+      opacity .3s ease,
+      visibility 0s linear .3s;
   }
   .lightbox.is-open {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
+    transition-delay: 0s;
+  }
+
+  body.lightbox-open,
+  body:has(.lightbox.is-open) {
+    overflow: hidden;
   }
   .lightbox-backdrop {
     position: absolute;
@@ -1252,7 +1286,10 @@ export const publicCss = String.raw`
       padding: 1.8rem 0;
     }
   }
-  .listing-card:hover { background: oklch(50% 0 0 / .02); }
+  .listing-card:hover,
+  .listing-card:focus-within {
+    background: color-mix(in oklch, var(--bg-muted) 45%, transparent);
+  }
   .listing-card .post-meta {
     margin: .2rem 0 0;
     grid-row: 1;
@@ -1276,12 +1313,17 @@ export const publicCss = String.raw`
     color: var(--fg-muted);
     text-wrap: pretty;
   }
+  .listing-card:focus-within .listing-arrow {
+    transform: translateX(.2rem);
+  }
+
   .listing-arrow {
     grid-column: 2;
     grid-row: 1 / span 2;
     align-self: center;
     color: var(--accent);
     font-size: 1.2rem;
+    transition: transform .2s ease;
     @media (min-width: 600px) {
       grid-column: auto;
       grid-row: auto;
@@ -1323,9 +1365,9 @@ export const publicCss = String.raw`
     transition: border-color .15s ease, box-shadow .15s ease;
   }
   .search-input::placeholder { color: var(--fg-muted); }
-  .search-input:focus {
+  .search-input:focus-visible {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px oklch(62% 0.16 80 / .16);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
     outline: none;
   }
   .search-results {
@@ -1341,7 +1383,7 @@ export const publicCss = String.raw`
     padding: .65rem 1.3rem;
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
-    color: #fff;
+    color: var(--on-accent);
     background: var(--accent);
     font-size: .8rem;
     font-weight: 600;
@@ -1350,8 +1392,8 @@ export const publicCss = String.raw`
     transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
   }
   .button:hover {
-    color: #fff;
-    background: var(--accent-soft);
+    color: var(--on-accent);
+    background: var(--accent-hover);
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
   }
@@ -1434,10 +1476,11 @@ export const publicCss = String.raw`
       content-visibility: visible;
     }
     .markdown a { color: #000; text-decoration: underline; }
-    .markdown a::after {
+    .markdown a[href^="http"]::after {
       content: " (" attr(href) ")";
       font-size: .8em;
       color: #555;
+      overflow-wrap: anywhere;
     }
     .markdown img { max-width: 100% !important; page-break-inside: avoid; }
     .markdown pre, .markdown blockquote {
