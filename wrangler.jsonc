@@ -10,7 +10,10 @@
     "not_found_handling": "none",
     "run_worker_first": true,
   },
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
   "vars": {
     "ENVIRONMENT": "development",
     "SITE_URL": "https://fauna-archive-production.eok8177.workers.dev/",
@@ -23,6 +26,11 @@
       "binding": "DB",
       "database_name": "fauna-archive-dev",
       "migrations_dir": "./migrations",
+    },
+    {
+      "binding": "fauna_db",
+      "database_name": "fauna-db",
+      "database_id": "8763318a-e06b-449d-97c2-bf4ce6a5fbba",
     },
   ],
   "r2_buckets": [
@@ -68,7 +76,7 @@
         {
           "binding": "DB",
           "database_name": "fauna-db",
-          "database_id": "66a7c636-b34e-4d26-97ce-d9ab210416b6",
+          "database_id": "8763318a-e06b-449d-97c2-bf4ce6a5fbba",
           "migrations_dir": "./migrations",
         },
       ],

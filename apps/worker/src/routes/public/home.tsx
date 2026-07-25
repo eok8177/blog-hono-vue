@@ -49,7 +49,7 @@ async function renderHome(c: Context<AppEnv>, locale: Locale) {
         <span class="hero-orbit hero-orbit-right" aria-hidden="true" />
         <div class="hero-inner">
           <p class="eyebrow">
-            {locale === 'en' ? 'A field archive · since 2024' : 'Польовий архів · з 2024 року'}
+            {locale === 'en' ? 'A field archive · since 1980' : 'Польовий архів · з 1980 року'}
           </p>
           <h1 id="home-title">{title}</h1>
           <p class="hero-intro">{intro}</p>

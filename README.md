@@ -24,6 +24,7 @@ pnpm dev
 
 ## Деплой на прод
 ```sh
+pnpm wrangler d1 create fauna-db
 pnpm exec wrangler d1 migrations apply fauna-db --env production --remote
 pnpm wrangler deploy --env production
 ```
