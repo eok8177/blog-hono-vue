@@ -27,11 +27,6 @@
       "database_name": "fauna-archive-dev",
       "migrations_dir": "./migrations",
     },
-    {
-      "binding": "fauna_db",
-      "database_name": "fauna-db",
-      "database_id": "8763318a-e06b-449d-97c2-bf4ce6a5fbba",
-    },
   ],
   "r2_buckets": [
     {
