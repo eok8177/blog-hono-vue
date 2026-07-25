@@ -42,7 +42,7 @@ const folders = useQuery({
 const mediaPage = ref(1);
 const mediaPageSize = 20;
 const media = useQuery({
-  queryKey: ['media', { folder: folderFilter, page: mediaPage.value }],
+  queryKey: computed(() => ['media', { folder: folderFilter.value, page: mediaPage.value }]),
   queryFn: () => {
     const params = new URLSearchParams();
     if (folderFilter.value) params.set('folder', folderFilter.value);

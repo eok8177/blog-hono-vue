@@ -14,7 +14,7 @@ const client = useQueryClient();
 const page = ref(1);
 const pageSize = 10;
 const users = useQuery({
-  queryKey: ['users', page.value],
+  queryKey: computed(() => ['users', page.value]),
   queryFn: () =>
     api<{ items: User[]; total: number }>(`/users?page=${page.value}&pageSize=${pageSize}`),
 });

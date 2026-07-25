@@ -17,7 +17,7 @@ const client = useQueryClient();
 const page = ref(1);
 const pageSize = 10;
 const redirects = useQuery({
-  queryKey: ['redirects', page.value],
+  queryKey: computed(() => ['redirects', page.value]),
   queryFn: () =>
     api<{ items: Redirect[]; total: number }>(
       `/redirects?page=${page.value}&pageSize=${pageSize}`,

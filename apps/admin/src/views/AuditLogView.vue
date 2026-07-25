@@ -13,7 +13,7 @@ type Event = {
 const page = ref(1);
 const pageSize = 20;
 const events = useQuery({
-  queryKey: ['audit-log', page.value],
+  queryKey: computed(() => ['audit-log', page.value]),
   queryFn: () =>
     api<{ items: Event[]; total: number }>(
       `/audit-log?page=${page.value}&pageSize=${pageSize}`,

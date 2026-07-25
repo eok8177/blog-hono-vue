@@ -119,15 +119,11 @@ async function save() {
       <label>Опис українською <textarea v-model="form.descriptionMdUk" rows="5" /></label>
       <label>Description English <textarea v-model="form.descriptionMdEn" rows="5" /></label>
       <div class="admin-form-actions">
-        <label class="admin-checkbox"
-          ><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label
-        >
-        <label class="admin-checkbox"
-          ><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label
-        >
-        <label
-          >Порядок у меню <input v-model.number="form.menuOrder" type="number" min="0"
-        /></label>
+        <label class="admin-checkbox"><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label>
+        <label class="admin-checkbox"><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label>
+        <label>
+            Порядок у меню <input v-model.number="form.menuOrder" type="number" min="0"/>
+        </label>
         <label
           >Статус
           <select v-model="form.status">

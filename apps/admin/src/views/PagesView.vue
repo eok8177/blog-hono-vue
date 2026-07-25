@@ -17,7 +17,7 @@ const error = ref('');
 const page = ref(1);
 const pageSize = 10;
 const pages = useQuery({
-  queryKey: ['pages', page.value],
+  queryKey: computed(() => ['pages', page.value]),
   queryFn: () =>
     api<{ items: Page[]; total: number }>(`/pages?page=${page.value}&pageSize=${pageSize}`),
 });

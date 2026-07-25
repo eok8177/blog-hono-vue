@@ -16,7 +16,7 @@ const error = ref('');
 const page = ref(1);
 const pageSize = 10;
 const categories = useQuery({
-  queryKey: ['categories', page.value],
+  queryKey: computed(() => ['categories', page.value]),
   queryFn: () =>
     api<{ items: Category[]; total: number }>(
       `/categories?page=${page.value}&pageSize=${pageSize}`,
@@ -76,23 +76,23 @@ function statusLabel(status: string) {
           <tr v-for="item in items" :key="item.id">
             <td>
               <div class="admin-primary-cell">
-                <strong>{{ item.title_uk }}</strong
-                ><span>{{ item.title_en || 'Без English перекладу' }}</span>
+                <strong>{{ item.title_uk }}</strong>
+                <span>{{ item.title_en || 'Без English перекладу' }}</span>
               </div>
             </td>
             <td>
               <code>{{ item.slug }}</code>
             </td>
             <td>
-              <span class="admin-status-badge" :class="`admin-status-${item.status}`">{{
-                statusLabel(item.status)
-              }}</span>
+              <span class="admin-status-badge" :class="`admin-status-${item.status}`">
+                  {{ statusLabel(item.status) }}
+              </span>
             </td>
             <td>{{ new Date(item.updated_at).toLocaleDateString('uk-UA') }}</td>
             <td class="admin-actions-cell">
-              <RouterLink class="admin-row-link" :to="`/categories/${item.id}`"
-                >Редагувати</RouterLink
-              >
+              <RouterLink class="admin-row-link" :to="`/categories/${item.id}`">
+                Редагувати
+              </RouterLink>
               <button type="button" class="admin-danger-button" @click="remove(item)">
                 Видалити
               </button>
