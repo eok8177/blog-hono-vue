@@ -1,53 +1,51 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { Crepe } from '@milkdown/crepe';
-import { replaceAll } from '@milkdown/kit/utils';
+
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/nord.css';
 
-const props = defineProps<{ modelValue: string }>();
-const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
+const props = defineProps<{
+  modelValue: string;
+}>();
 
-const editorRoot = ref<HTMLDivElement>();
-let crepe: Crepe | undefined;
-const ready = ref(false);
+const emit = defineEmits<{
+  'update:modelValue': [value: string];
+}>();
+
+const editorRoot = ref<HTMLDivElement | null>(null);
+
+let crepe: Crepe | null = null;
 
 onMounted(async () => {
-  if (!editorRoot.value) return;
+  if (!editorRoot.value) {
+    return;
+  }
+
   crepe = new Crepe({
     root: editorRoot.value,
-    defaultValue: props.modelValue,
+    defaultValue: props.modelValue ?? '',
   });
 
-  // Register change listener before creating
   crepe.on((listener) => {
-    listener.markdownUpdated((_ctx, markdown) => {
-      emit('update:modelValue', markdown);
+    listener.markdownUpdated((_ctx, markdown, previousMarkdown) => {
+      if (markdown !== previousMarkdown) {
+        emit('update:modelValue', markdown);
+      }
     });
   });
 
   await crepe.create();
-  ready.value = true;
 });
 
-onBeforeUnmount(async () => {
-  if (crepe) {
-    await crepe.destroy();
-    crepe = undefined;
+onBeforeUnmount(() => {
+  const instance = crepe;
+  crepe = null;
+
+  if (instance) {
+    void instance.destroy();
   }
 });
-
-// Sync external changes into the editor (only after editor is ready)
-watch(
-  [() => props.modelValue, ready],
-  ([value, isReady]) => {
-    if (!isReady || !crepe) return;
-    const current = crepe.getMarkdown();
-    if (value !== current) {
-      crepe.editor.action(replaceAll(value));
-    }
-  },
-);
 
 defineExpose({
   getContent: () => crepe?.getMarkdown() ?? '',
@@ -55,5 +53,8 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="editorRoot" class="milkdown-editor-host" @contextmenu.prevent />
+  <div
+    ref="editorRoot"
+    class="milkdown-editor-host"
+  />
 </template>
