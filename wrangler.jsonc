@@ -16,7 +16,7 @@
   },
   "vars": {
     "ENVIRONMENT": "development",
-    "SITE_URL": "https://fauna-archive-production.eok8177.workers.dev/",
+    "SITE_URL": "https://fauna.eok8177.workers.dev/",
     "ACCESS_TEAM_DOMAIN": "eok.cloudflareaccess.com",
     "ACCESS_AUD": "c81f58275a43945e724175979b784c9440cc98ebcf3bec6a5cf2cbb7b39b7187",
     "TURNSTILE_SITE_KEY": "0x4AAAAAACoBCAOcSFmkVfIp",
@@ -35,34 +35,11 @@
     },
   ],
   "env": {
-    "staging": {
-      "name": "fauna-archive-staging",
-      "vars": {
-        "ENVIRONMENT": "staging",
-        "SITE_URL": "https://staging.example.invalid",
-        "ACCESS_TEAM_DOMAIN": "",
-        "ACCESS_AUD": "",
-        "TURNSTILE_SITE_KEY": "",
-      },
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "fauna-archive-staging-db",
-          "migrations_dir": "./migrations",
-        },
-      ],
-      "r2_buckets": [
-        {
-          "binding": "MEDIA",
-          "bucket_name": "fauna-archive-media-staging",
-        },
-      ],
-    },
     "production": {
-      "name": "fauna-archive-production",
+      "name": "fauna",
       "vars": {
         "ENVIRONMENT": "production",
-        "SITE_URL": "https://fauna-archive-production.eok8177.workers.dev/",
+        "SITE_URL": "https://fauna.eok8177.workers.dev/",
         "ACCESS_TEAM_DOMAIN": "eok.cloudflareaccess.com",
         "ACCESS_AUD": "c81f58275a43945e724175979b784c9440cc98ebcf3bec6a5cf2cbb7b39b7187",
         "TURNSTILE_SITE_KEY": "0x4AAAAAACoBCAOcSFmkVfIp",
@@ -78,7 +55,7 @@
       "r2_buckets": [
         {
           "binding": "MEDIA",
-          "bucket_name": "flora-fauna-media",
+          "bucket_name": "fauna",
         },
       ],
     },
