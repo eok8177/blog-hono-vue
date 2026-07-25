@@ -1136,7 +1136,6 @@ export const publicCss = String.raw`
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3rem;
   }
   .lightbox-track {
     display: flex;
