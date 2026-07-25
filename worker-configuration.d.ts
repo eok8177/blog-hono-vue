@@ -6,7 +6,7 @@ interface __BaseEnv_Env {
 	DB: D1Database;
 	ASSETS: Fetcher;
 	ENVIRONMENT: "staging" | "production" | "development";
-	SITE_URL: "https://staging.example.invalid" | "https://fauna-archive-production.eok8177.workers.dev/";
+	SITE_URL: "https://staging.example.invalid" | "https://fauna.eok8177.workers.dev/";
 	ACCESS_TEAM_DOMAIN: "" | "eok.cloudflareaccess.com";
 	ACCESS_AUD: "" | "c81f58275a43945e724175979b784c9440cc98ebcf3bec6a5cf2cbb7b39b7187";
 	TURNSTILE_SITE_KEY: "" | "0x4AAAAAACoBCAOcSFmkVfIp";
@@ -30,7 +30,7 @@ declare namespace Cloudflare {
 		DB: D1Database;
 		ASSETS: Fetcher;
 		ENVIRONMENT: "production";
-		SITE_URL: "https://fauna-archive-production.eok8177.workers.dev/";
+		SITE_URL: "https://fauna.eok8177.workers.dev/";
 		ACCESS_TEAM_DOMAIN: "eok.cloudflareaccess.com";
 		ACCESS_AUD: "c81f58275a43945e724175979b784c9440cc98ebcf3bec6a5cf2cbb7b39b7187";
 		TURNSTILE_SITE_KEY: "0x4AAAAAACoBCAOcSFmkVfIp";

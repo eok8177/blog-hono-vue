@@ -1,5 +1,5 @@
 {
-  "name": "fauna-south-ukraine-archive",
+  "name": "fauna",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.15.1",
@@ -25,8 +25,8 @@
     "test": "pnpm -r test",
     "test:e2e": "playwright test --config=playwright.config.ts",
     "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
-    "db:migrate:local": "wrangler d1 migrations apply fauna-archive-dev --local",
-    "db:seed:local": "wrangler d1 execute fauna-archive-dev --local --file scripts/seed.sql"
+    "db:migrate:local": "wrangler d1 migrations apply fauna-dev --local",
+    "db:seed:local": "wrangler d1 execute fauna-dev --local --file scripts/seed.sql"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

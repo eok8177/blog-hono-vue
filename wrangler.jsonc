@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "fauna-archive",
+  "name": "fauna",
   "main": "apps/worker/src/index.tsx",
   "compatibility_date": "2026-02-24",
   "compatibility_flags": ["nodejs_compat"],
@@ -24,14 +24,14 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "fauna-archive-dev",
+      "database_name": "fauna-dev",
       "migrations_dir": "./migrations",
     },
   ],
   "r2_buckets": [
     {
       "binding": "MEDIA",
-      "bucket_name": "fauna-archive-media-dev",
+      "bucket_name": "fauna-dev",
     },
   ],
   "env": {
