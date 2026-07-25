@@ -54,7 +54,6 @@ async function remove(post: Post) {
       <div class="admin-list-toolbar">
         <label class="admin-search">
           <span class="sr-only">Пошук публікацій</span>
-          <span class="admin-search-icon">⌕</span>
           <input v-model="q" type="search" placeholder="Пошук за назвою…" />
         </label>
         <span v-if="data" class="admin-list-count">{{ data.total }} матеріалів</span>
