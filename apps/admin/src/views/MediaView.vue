@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { api, ApiError } from '../api/client';
-import { uploadMedia } from '../api/media';
+import { uploadMedia, cancelUpload, onUploadProgress, type UploadProgress } from '../api/media';
 import AdminPagination from '../components/AdminPagination.vue';
 
 type Media = {
@@ -70,24 +70,51 @@ const form = reactive({
   version: '',
 });
 
+const uploadProgress = ref<UploadProgress | null>(null);
+const keepOriginal = ref(false);
+
 const upload = useMutation({
-  mutationFn: () => {
+  mutationFn: async () => {
     if (!file.value) throw new Error('Оберіть файл.');
-    return uploadMedia(file.value, altUk.value, uploadFolder.value || folderFilter.value);
+    uploadProgress.value = null;
+    const unsub = onUploadProgress((p) => {
+      uploadProgress.value = p;
+    });
+    try {
+      return await uploadMedia(
+        file.value,
+        altUk.value,
+        uploadFolder.value || folderFilter.value,
+        keepOriginal.value,
+      );
+    } finally {
+      unsub();
+    }
   },
   onSuccess: async () => {
-    message.value = 'Файл завантажено.';
     file.value = undefined;
     altUk.value = '';
+    keepOriginal.value = false;
+    setTimeout(() => { uploadProgress.value = null; }, 3000);
     await Promise.all([
       client.invalidateQueries({ queryKey: ['media'] }),
       client.invalidateQueries({ queryKey: ['media-folders'] }),
     ]);
   },
   onError: (e) => {
-    message.value = e instanceof Error ? e.message : 'Upload не вдався.';
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      // Cancelled by user – keep UI clean
+    } else {
+      message.value = e instanceof Error ? e.message : 'Upload не вдався.';
+    }
   },
 });
+
+function retry() {
+  uploadProgress.value = null;
+  message.value = '';
+  upload.mutate();
+}
 
 function selected(event: Event) {
   file.value = (event.target as HTMLInputElement).files?.[0];
@@ -269,21 +296,25 @@ watch(folderFilter, () => {
 
     <!-- Upload form -->
     <form class="admin-upload-card" @submit.prevent="upload.mutate()">
-      <div class="admin-upload-icon">↑</div>
+      <div class="admin-upload-icon">📁</div>
       <div>
         <h2>Додати зображення</h2>
         <p>JPEG, PNG або WebP. Варіанти створюються автоматично.</p>
       </div>
+
       <label class="admin-file-input"
         >Вибрати файл<input
           type="file"
           accept="image/jpeg,image/png,image/webp"
           required
+          :disabled="upload.isPending.value"
           @change="selected"
       /></label>
+
       <label class="admin-upload-alt"
         >Alt українською<input v-model="altUk" required placeholder="Опишіть зображення"
       /></label>
+
       <label class="admin-upload-folder"
         >Папка
         <input
@@ -296,9 +327,53 @@ watch(folderFilter, () => {
           <option v-for="f in folders.data.value?.folders ?? []" :key="f" :value="f" />
         </datalist>
       </label>
-      <button :disabled="upload.isPending.value">
-        {{ upload.isPending.value ? 'Підготовка…' : 'Завантажити' }}
-      </button>
+
+      <label class="admin-checkbox">
+        <input v-model="keepOriginal" type="checkbox" :disabled="upload.isPending.value" />
+        Зберегти оригінал
+      </label>
+
+      <!-- Progress bar -->
+      <div v-if="uploadProgress" class="admin-upload-progress">
+        <div class="admin-progress-bar">
+          <span
+            class="admin-progress-fill"
+            :class="{
+              'admin-progress-error': uploadProgress.stage === 'error',
+              'admin-progress-done': uploadProgress.stage === 'done',
+            }"
+            :style="{ width: uploadProgress.percent + '%' }"
+          />
+        </div>
+        <p class="admin-progress-label">{{ uploadProgress.message }}</p>
+      </div>
+
+      <div class="admin-upload-actions">
+        <button
+          v-if="uploadProgress?.stage === 'converting' || uploadProgress?.stage === 'uploading'"
+          type="button"
+          class="admin-secondary-button"
+          @click="cancelUpload()"
+        >
+          Скасувати
+        </button>
+
+        <button
+          v-if="uploadProgress?.stage === 'error'"
+          type="button"
+          class="button"
+          @click="retry"
+        >
+          Повторити
+        </button>
+
+        <button
+          v-else-if="uploadProgress?.stage !== 'converting' && uploadProgress?.stage !== 'uploading'"
+          :disabled="upload.isPending.value"
+        >
+          {{ upload.isPending.value ? 'Конвертація…' : 'Завантажити' }}
+        </button>
+      </div>
     </form>
 
     <p v-if="message" role="status" aria-live="polite">{{ message }}</p>

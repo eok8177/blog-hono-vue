@@ -164,6 +164,8 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
       media.variant_960_key,
       media.variant_1600_key,
     ].filter((key): key is string => Boolean(key));
+    // Also try to clean up original if present
+    if (media.original_key) keys.push(media.original_key);
     try {
       await Promise.all(keys.map((key) => c.env.MEDIA.delete(key)));
     } catch (error) {
@@ -253,6 +255,28 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
 
     const hashes = await Promise.all(files.map(({ bytes }) => sha256(bytes)));
     const keys = hashes.map((hash, index) => `variants/${hash}-${[480, 960, 1600][index]}.webp`);
+
+    // Handle optional original file (private, not cached)
+    const originalFile = form.get('original');
+    let originalKey: string | null = null;
+    const originalMime = form.get('originalMime');
+    if (originalFile instanceof File && originalFile.size > 0 && typeof originalMime === 'string') {
+      const originalBytes = new Uint8Array(await originalFile.arrayBuffer());
+      const originalHash = await sha256(originalBytes);
+      const ext = originalMime.split('/')[1] ?? 'bin';
+      originalKey = `originals/${originalHash}.${ext}`;
+      // Store original in R2 (private, authenticated access only)
+      await c.env.MEDIA.put(originalKey, originalBytes, {
+        httpMetadata: {
+          contentType: originalMime,
+          cacheControl: 'private, no-store',
+        },
+        customMetadata: { source: 'admin-upload' },
+      });
+    }
+
+    const allKeys = [...keys, ...(originalKey ? [originalKey] : [])];
+
     try {
       await Promise.all(
         files.map(({ bytes }, index) =>
@@ -269,17 +293,18 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
       const folder = typeof form.get('folder') === 'string' ? String(form.get('folder')).trim().slice(0, 200) : '';
       const largest = inspected[2]!;
       await c.env.DB.prepare(
-        'INSERT INTO media(id,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,sha256,alt_uk,alt_en,caption_uk,caption_en,credit,license,source_url,folder,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO media(id,original_key,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,sha256,alt_uk,alt_en,caption_uk,caption_en,credit,license,source_url,folder,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       )
         .bind(
           id,
+          originalKey,
           keys[0]!,
           keys[1]!,
           keys[2]!,
           'image/webp',
           largest.width,
           largest.height,
-          total,
+          total + (originalKey ? 0 : 0), // total variants size
           hashes[2]!,
           altUk.trim(),
           typeof form.get('altEn') === 'string' ? String(form.get('altEn')) : null,
@@ -297,7 +322,8 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
         .run();
       return c.json(apiSuccess({ id }), 201);
     } catch (error) {
-      await Promise.all(keys.map((key) => c.env.MEDIA.delete(key)));
+      // Cleanup all uploaded keys on failure
+      await Promise.all(allKeys.map((key) => c.env.MEDIA.delete(key).catch(() => {})));
       throw error;
     }
   });
