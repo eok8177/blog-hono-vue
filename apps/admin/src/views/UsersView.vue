@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { api, ApiError } from '../api/client';
+import AdminPagination from '../components/AdminPagination.vue';
 type User = {
   id: string;
   email: string;
@@ -10,11 +11,17 @@ type User = {
   is_active: number;
 };
 const client = useQueryClient();
+const page = ref(1);
+const pageSize = 10;
 const users = useQuery({
-  queryKey: ['users'],
-  queryFn: () => api<{ items: User[]; total: number }>('/users'),
+  queryKey: ['users', page.value],
+  queryFn: () =>
+    api<{ items: User[]; total: number }>(`/users?page=${page.value}&pageSize=${pageSize}`),
 });
 const items = computed(() => users.data.value?.items ?? []);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil((users.data.value?.total ?? 0) / pageSize)),
+);
 const selectedId = ref<string>();
 const error = ref('');
 const form = reactive({ email: '', name: '', role: 'editor' as User['role'], isActive: true });
@@ -134,7 +141,7 @@ async function remove(user: User) {
             <td class="admin-actions-cell">
               <button
                 type="button"
-                class="admin-row-link admin-secondary-button"
+                class="admin-row-link"
                 @click="edit(user)"
               >
                 Редагувати</button
@@ -145,6 +152,11 @@ async function remove(user: User) {
           </tr>
         </tbody>
       </table>
+      <AdminPagination
+        :page="page"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+      />
     </div>
   </section>
 </template>

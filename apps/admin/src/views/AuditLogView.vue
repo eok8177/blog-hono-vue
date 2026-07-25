@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useQuery } from '@tanstack/vue-query';
 import { api } from '../api/client';
+import AdminPagination from '../components/AdminPagination.vue';
 type Event = {
   id: string;
   action: string;
@@ -9,11 +10,19 @@ type Event = {
   created_at: string;
   actor_email: string | null;
 };
+const page = ref(1);
+const pageSize = 20;
 const events = useQuery({
-  queryKey: ['audit-log'],
-  queryFn: () => api<{ items: Event[]; total: number }>('/audit-log'),
+  queryKey: ['audit-log', page.value],
+  queryFn: () =>
+    api<{ items: Event[]; total: number }>(
+      `/audit-log?page=${page.value}&pageSize=${pageSize}`,
+    ),
 });
 const items = computed(() => events.data.value?.items ?? []);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil((events.data.value?.total ?? 0) / pageSize)),
+);
 </script>
 <template>
   <section>
@@ -48,6 +57,11 @@ const items = computed(() => events.data.value?.items ?? []);
           </tr>
         </tbody>
       </table>
+      <AdminPagination
+        :page="page"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+      />
     </div>
   </section>
 </template>

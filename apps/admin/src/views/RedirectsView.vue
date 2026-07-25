@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { api, ApiError } from '../api/client';
+import AdminPagination from '../components/AdminPagination.vue';
 
 type Redirect = {
   id: string;
@@ -13,11 +14,19 @@ type Redirect = {
 };
 
 const client = useQueryClient();
+const page = ref(1);
+const pageSize = 10;
 const redirects = useQuery({
-  queryKey: ['redirects'],
-  queryFn: () => api<{ items: Redirect[]; total: number }>('/redirects'),
+  queryKey: ['redirects', page.value],
+  queryFn: () =>
+    api<{ items: Redirect[]; total: number }>(
+      `/redirects?page=${page.value}&pageSize=${pageSize}`,
+    ),
 });
 const items = computed(() => redirects.data.value?.items ?? []);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil((redirects.data.value?.total ?? 0) / pageSize)),
+);
 const error = ref('');
 const deletingId = ref<string>();
 
@@ -85,6 +94,11 @@ async function remove(redirect: Redirect) {
           </tr>
         </tbody>
       </table>
+      <AdminPagination
+        :page="page"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+      />
     </div>
   </section>
 </template>

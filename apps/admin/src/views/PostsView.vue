@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { api, ApiError } from '../api/client';
+import AdminPagination from '../components/AdminPagination.vue';
 
 type Post = { id: string; slug: string; title_uk: string; status: string; updated_at: string };
 const q = ref('');
@@ -98,13 +99,7 @@ async function remove(post: Post) {
           </tbody>
         </table>
       </div>
-      <div v-if="data && data.total" class="admin-pagination">
-        <span>Сторінка {{ page }} з {{ totalPages }}</span>
-        <div>
-          <button type="button" :disabled="page === 1" @click="page--">← Назад</button>
-          <button type="button" :disabled="page >= totalPages" @click="page++">Далі →</button>
-        </div>
-      </div>
+      <AdminPagination :page="page" :total-pages="totalPages" @update:page="page = $event" />
     </div>
   </section>
 </template>

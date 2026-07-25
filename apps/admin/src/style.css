@@ -1,11 +1,11 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-500: #465fff;
-  --color-brand-600: #3641f5;
-  --color-brand-700: #2f36c9;
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-500: #16a34a;
+  --color-brand-600: #15803d;
+  --color-brand-700: #166534;
   --color-paper: #f8fafc;
   --radius-admin: 0.75rem;
 }
@@ -343,7 +343,7 @@
     @apply whitespace-nowrap;
   }
   .admin-row-link {
-    @apply mr-3 text-sm font-medium no-underline;
+    @apply mr-3 cursor-pointer border-0 bg-transparent p-0 text-sm font-medium text-brand-600 no-underline shadow-none hover:text-brand-700;
   }
   .admin-danger-button {
     @apply bg-transparent px-0 py-0 text-sm font-medium text-red-600 shadow-none hover:bg-transparent hover:text-red-700;
@@ -600,11 +600,11 @@
 
 :root[data-theme='dark'] .admin-nav-link-active {
   background: #1d2939;
-  color: #aab4ff;
+  color: #86efac;
 }
 
 :root[data-theme='dark'] .admin-nav-link-active .admin-nav-icon {
-  color: #aab4ff;
+  color: #86efac;
 }
 
 :root[data-theme='dark'] .admin-breadcrumb span,
@@ -665,8 +665,8 @@
 }
 
 :root[data-theme='dark'] .admin-stat-blue .admin-stat-icon {
-  background: #1e2a5e;
-  color: #aab4ff;
+  background: #052e16;
+  color: #86efac;
 }
 
 :root[data-theme='dark'] .admin-stat-green .admin-stat-icon {
@@ -692,6 +692,9 @@
   background: #344054;
   color: #d0d5dd;
 }
+:root[data-theme='dark'] .admin-danger-button {
+  background: transparent;
+}
 
 :root[data-theme='dark'] .admin-progress .admin-progress-muted {
   background: #9b8afb;
@@ -700,13 +703,13 @@
 :root[data-theme='dark'] .admin-quick-card a,
 :root[data-theme='dark'] .admin-card-heading a,
 :root[data-theme='dark'] a {
-  color: #aab4ff;
+  color: #86efac;
 }
 
 :root[data-theme='dark'] button,
 :root[data-theme='dark'] .button,
 :root[data-theme='dark'] .admin-button {
-  color: #eef2ff;
+  color: #f0fdf4;
 }
 
 :root[data-theme='dark'] code {
@@ -723,19 +726,19 @@
   color: #f2f4f7;
 }
 :root[data-theme='dark'] .admin-folder-tab-active {
-  background: #465fff;
+  background: #16a34a;
   color: #fff;
 }
 :root[data-theme='dark'] .admin-folder-tab-active:hover {
-  background: #3641f5;
+  background: #15803d;
   color: #fff;
 }
 :root[data-theme='dark'] .admin-batch-bar {
-  background: #1e2a5e;
-  border-color: #3641f5;
+  background: #052e16;
+  border-color: #15803d;
 }
 :root[data-theme='dark'] .admin-batch-bar span {
-  color: #aab4ff;
+  color: #86efac;
 }
 :root[data-theme='dark'] .admin-inline-select {
   background: #101828;
@@ -755,11 +758,11 @@
   color: #f2f4f7;
 }
 :root[data-theme='dark'] .admin-gallery-tab-active {
-  background: #465fff;
+  background: #16a34a;
   color: #fff;
 }
 :root[data-theme='dark'] .admin-gallery-tab-active:hover {
-  background: #3641f5;
+  background: #15803d;
   color: #fff;
 }
 :root[data-theme='dark'] .admin-gallery-item {

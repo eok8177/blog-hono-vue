@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { api, ApiError } from '../api/client';
 import { uploadMedia } from '../api/media';
+import AdminPagination from '../components/AdminPagination.vue';
 
 type Media = {
   id: string;
@@ -38,18 +39,24 @@ const folders = useQuery({
   queryFn: () => api<{ folders: string[] }>('/media/folders'),
 });
 
+const mediaPage = ref(1);
+const mediaPageSize = 20;
 const media = useQuery({
-  queryKey: ['media', { folder: folderFilter }],
+  queryKey: ['media', { folder: folderFilter, page: mediaPage.value }],
   queryFn: () => {
     const params = new URLSearchParams();
     if (folderFilter.value) params.set('folder', folderFilter.value);
-    params.set('pageSize', '100');
+    params.set('page', String(mediaPage.value));
+    params.set('pageSize', String(mediaPageSize));
     const qs = params.toString();
-    return api<{ items: Media[] }>(`/media${qs ? `?${qs}` : ''}`);
+    return api<{ items: Media[]; total: number }>(`/media${qs ? `?${qs}` : ''}`);
   },
 });
 
 const items = computed(() => media.data.value?.items ?? []);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil((media.data.value?.total ?? 0) / mediaPageSize)),
+);
 
 const form = reactive({
   altUk: '',
@@ -182,6 +189,7 @@ async function createFolder() {
 
 watch(folderFilter, () => {
   selectedIds.value = new Set();
+  mediaPage.value = 1;
 });
 </script>
 
@@ -378,5 +386,10 @@ watch(folderFilter, () => {
         </div>
       </article>
     </div>
+    <AdminPagination
+      :page="mediaPage"
+      :total-pages="totalPages"
+      @update:page="mediaPage = $event"
+    />
   </section>
 </template>
