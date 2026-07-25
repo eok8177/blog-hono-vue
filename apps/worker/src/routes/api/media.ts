@@ -26,9 +26,34 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
       ).bind(...args, pagination.pageSize, (pagination.page - 1) * pagination.pageSize),
       c.env.DB.prepare(`SELECT count(*) count FROM media ${where}`).bind(...args),
     ]);
+    type MediaRow = {
+      id: string;
+      variant_480_key: string;
+      variant_960_key: string;
+      variant_1600_key: string;
+      mime_type: string;
+      width: number;
+      height: number;
+      size_bytes: number;
+      alt_uk: string;
+      alt_en: string | null;
+      caption_uk: string | null;
+      caption_en: string | null;
+      credit: string | null;
+      license: string | null;
+      folder: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    };
+    const items = (results[0]!.results as unknown as MediaRow[]).map((row) => ({
+      ...row,
+      r2Key: row.variant_960_key,
+      url: `/media/file/${row.variant_960_key}`,
+    }));
     return c.json(
       apiSuccess({
-        items: results[0]!.results,
+        items,
         total: Number((results[1]!.results[0] as { count: number }).count),
         page: pagination.page,
         pageSize: pagination.pageSize,
@@ -266,6 +291,29 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
       await Promise.all(keys.map((key) => c.env.MEDIA.delete(key)));
       throw error;
     }
+  });
+
+  // Serve media by R2 key: /media/file/variants/{hash}-{width}.webp
+  app.get('/media/file/*', async (c) => {
+    const key = c.req.path.slice('/media/file/'.length);
+
+    if (!key || key.includes('..')) {
+      return c.notFound();
+    }
+
+    const object = await c.env.MEDIA.get(key);
+    if (!object) return c.notFound();
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('ETag', object.httpEtag);
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    headers.set('X-Content-Type-Options', 'nosniff');
+
+    return new Response(object.body, {
+      status: 200,
+      headers,
+    });
   });
 
   app.get('/media/:id/:variant', async (c) => {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, ApiError } from '../api/client';
+import AdminGallery from '../components/AdminGallery.vue';
 import MilkdownEditor from '../components/MilkdownEditor.vue';
 
 const route = useRoute();
@@ -46,25 +47,10 @@ type StoredPage = {
   mediaIds: string[];
 };
 
-type Media = { id: string; alt_uk: string; folder: string; status: string };
-const availableMedia = ref<Media[]>([]);
-const galleryFolderFilter = ref('');
-const galleryFolders = computed(() => {
-  const folders = new Set(availableMedia.value.map((m) => m.folder).filter(Boolean));
-  return [...folders].sort();
-});
-const hasUnfoldered = computed(() => availableMedia.value.some((m) => !m.folder));
-const filteredGalleryMedia = computed(() => {
-  if (!galleryFolderFilter.value) return availableMedia.value;
-  if (galleryFolderFilter.value === '__nofolder__')
-    return availableMedia.value.filter((m) => !m.folder);
-  return availableMedia.value.filter((m) => m.folder === galleryFolderFilter.value);
-});
+
 
 onMounted(async () => {
   try {
-    const media = await api<{ items: Media[] }>('/media');
-    availableMedia.value = media.items.filter((item) => item.status === 'ready');
     if (!id) return;
     const page = await api<StoredPage>(`/pages/${id}`);
     Object.assign(form, {
@@ -163,64 +149,7 @@ async function save() {
           >Text English <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn"
         /></label>
       </div>
-      <fieldset>
-        <legend>Галерея</legend>
-        <p v-if="!availableMedia.length">Спочатку завантажте зображення в Медіатеці.</p>
-        <template v-else>
-          <div class="admin-gallery-toolbar">
-            <button
-              type="button"
-              class="admin-gallery-tab"
-              :class="{ 'admin-gallery-tab-active': !galleryFolderFilter }"
-              @click="galleryFolderFilter = ''"
-            >
-              Усі
-            </button>
-            <button
-              v-for="f in galleryFolders"
-              :key="f"
-              type="button"
-              class="admin-gallery-tab"
-              :class="{ 'admin-gallery-tab-active': galleryFolderFilter === f }"
-              @click="galleryFolderFilter = f"
-            >
-              {{ f }}
-            </button>
-            <button
-              v-if="hasUnfoldered"
-              type="button"
-              class="admin-gallery-tab"
-              :class="{ 'admin-gallery-tab-active': galleryFolderFilter === '__nofolder__' }"
-              @click="galleryFolderFilter = '__nofolder__'"
-            >
-              Без папки
-            </button>
-          </div>
-          <div class="admin-gallery-grid">
-            <label
-              v-for="media in filteredGalleryMedia"
-              :key="media.id"
-              class="admin-gallery-item"
-            >
-              <input
-                v-model="form.mediaIds"
-                type="checkbox"
-                :value="media.id"
-                class="admin-gallery-checkbox"
-              />
-              <img
-                :src="`/media/${media.id}/480`"
-                :alt="media.alt_uk"
-                width="240"
-                height="160"
-                loading="lazy"
-                class="admin-gallery-thumb"
-              />
-              <span class="admin-gallery-name">{{ media.alt_uk }}</span>
-            </label>
-          </div>
-        </template>
-      </fieldset>
+      <AdminGallery v-model="form.mediaIds" />
       <div class="admin-form-actions">
         <label class="admin-checkbox"
           ><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label
