@@ -3,13 +3,6 @@ export const publicCss = String.raw`
 @layer reset, base, layout, components, utils, theme;
 
 /* ══════════════════════════════════════════════════
-   UNLAYERED — must resolve across all layers
-   ══════════════════════════════════════════════════ */
-:root {
-  --reading-progress: 0;
-}
-
-/* ══════════════════════════════════════════════════
    RESET
    ══════════════════════════════════════════════════ */
 @layer reset {
@@ -33,89 +26,48 @@ export const publicCss = String.raw`
 }
 
 /* ══════════════════════════════════════════════════
-   THEME — light & dark via OKLCH
+   THEME — light & dark via OKLCH + light-dark()
+   Single source of truth: no more triple-duplicated
+   color blocks across prefers-color-scheme / data-theme.
    ══════════════════════════════════════════════════ */
 @layer theme {
   :root {
-    /* light */
-    --bg:            oklch(97.5% 0.006 90);
-    --bg-card:       oklch(100% 0 0);
-    --bg-muted:      oklch(95.5% 0.008 88);
-    --fg:            oklch(15% 0.01 90);
-    --fg-muted:      oklch(48% 0.02 85);
-    --accent:        oklch(62% 0.16 80);
-    --accent-soft:   oklch(72% 0.12 80);
-    --border:        oklch(90% 0.015 88);
-    --border-light:  oklch(93% 0.01 88);
+    color-scheme: light dark;
 
-    --shadow-sm:     0 1px 2px oklch(15% 0.01 90 / .04);
-    --shadow-md:     0 4px 16px oklch(15% 0.01 90 / .07);
-    --shadow-lg:     0 12px 40px oklch(15% 0.01 90 / .10);
+    --bg:             light-dark(oklch(97.5% 0.006 90),        oklch(19% 0.012 95));
+    --bg-card:        light-dark(oklch(100% 0 0),               oklch(23% 0.014 95));
+    --bg-muted:       light-dark(oklch(95.5% 0.008 88),        oklch(25% 0.018 93));
+    --fg:             light-dark(oklch(15% 0.01 90),           oklch(90% 0.01 95));
+    --fg-muted:       light-dark(oklch(48% 0.02 85),           oklch(66% 0.025 90));
+    --accent:         light-dark(oklch(62% 0.16 80),           oklch(68% 0.16 80));
+    --accent-soft:    light-dark(oklch(72% 0.12 80),           oklch(58% 0.12 80));
+    --border:         light-dark(oklch(90% 0.015 88),          oklch(30% 0.022 93));
+    --border-light:   light-dark(oklch(93% 0.01 88),           oklch(26% 0.018 93));
 
-    --radius-sm:     6px;
-    --radius-md:     10px;
+    --shadow-sm:      light-dark(0 1px 2px oklch(15% 0.01 90 / .04),  0 1px 2px oklch(0% 0 0 / .25));
+    --shadow-md:      light-dark(0 4px 16px oklch(15% 0.01 90 / .07), 0 4px 16px oklch(0% 0 0 / .35));
+    --shadow-lg:      light-dark(0 12px 40px oklch(15% 0.01 90 / .10), 0 12px 40px oklch(0% 0 0 / .45));
 
-    --serif:         "Playfair Display", Georgia, "Times New Roman", serif;
-    --sans:          "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
-    --mono:          "IBM Plex Mono", "SF Mono", "Cascadia Code", Consolas, monospace;
+    --radius-sm:      6px;
+    --radius-md:      10px;
 
-    --header-h:      56px;
-    --site-header-bg: oklch(97.5% 0.006 90 / .82);
+    --serif:          "Playfair Display", Georgia, "Times New Roman", serif;
+    --sans:           "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono:           "IBM Plex Mono", "SF Mono", "Cascadia Code", Consolas, monospace;
+
+    --header-h:       56px;
+    --site-header-bg: light-dark(oklch(97.5% 0.006 90 / .82), oklch(19% 0.012 95 / .82));
+
+    --reading-progress: 0;
   }
 
-  /* dark */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg:            oklch(19% 0.012 95);
-      --bg-card:       oklch(23% 0.014 95);
-      --bg-muted:      oklch(25% 0.018 93);
-      --fg:            oklch(90% 0.01 95);
-      --fg-muted:      oklch(66% 0.025 90);
-      --accent:        oklch(68% 0.16 80);
-      --accent-soft:   oklch(58% 0.12 80);
-      --border:        oklch(30% 0.022 93);
-      --border-light:  oklch(26% 0.018 93);
+  /* manual theme override — color-scheme flips light-dark() resolution */
+  [data-theme="dark"]  { color-scheme: dark; }
+  [data-theme="light"] { color-scheme: light; }
 
-      --shadow-sm:     0 1px 2px oklch(0% 0 0 / .25);
-      --shadow-md:     0 4px 16px oklch(0% 0 0 / .35);
-      --shadow-lg:     0 12px 40px oklch(0% 0 0 / .45);
-
-      --site-header-bg: oklch(19% 0.012 95 / .82);
-    }
-  }
-
-  /* manual dark toggle via <html data-theme="dark"> */
-  [data-theme="dark"] {
-    --bg:            oklch(19% 0.012 95);
-    --bg-card:       oklch(23% 0.014 95);
-    --bg-muted:      oklch(25% 0.018 93);
-    --fg:            oklch(90% 0.01 95);
-    --fg-muted:      oklch(66% 0.025 90);
-    --accent:        oklch(68% 0.16 80);
-    --accent-soft:   oklch(58% 0.12 80);
-    --border:        oklch(30% 0.022 93);
-    --border-light:  oklch(26% 0.018 93);
-    --shadow-sm:     0 1px 2px oklch(0% 0 0 / .25);
-    --shadow-md:     0 4px 16px oklch(0% 0 0 / .35);
-    --shadow-lg:     0 12px 40px oklch(0% 0 0 / .45);
-    --site-header-bg: oklch(19% 0.012 95 / .82);
-  }
-
-  /* forced-light override */
-  [data-theme="light"] {
-    --bg:            oklch(97.5% 0.006 90);
-    --bg-card:       oklch(100% 0 0);
-    --bg-muted:      oklch(95.5% 0.008 88);
-    --fg:            oklch(15% 0.01 90);
-    --fg-muted:      oklch(48% 0.02 85);
-    --accent:        oklch(62% 0.16 80);
-    --accent-soft:   oklch(72% 0.12 80);
-    --border:        oklch(90% 0.015 88);
-    --border-light:  oklch(93% 0.01 88);
-    --shadow-sm:     0 1px 2px oklch(15% 0.01 90 / .04);
-    --shadow-md:     0 4px 16px oklch(15% 0.01 90 / .07);
-    --shadow-lg:     0 12px 40px oklch(15% 0.01 90 / .10);
-    --site-header-bg: oklch(97.5% 0.006 90 / .82);
+  /* accessibility overrides */
+  @media (prefers-contrast: more) {
+    :root { --border: currentColor; --border-light: currentColor; }
   }
 }
 
@@ -124,15 +76,13 @@ export const publicCss = String.raw`
    ══════════════════════════════════════════════════ */
 @layer base {
   html {
-    color-scheme: light dark;
     accent-color: var(--accent);
+    scrollbar-gutter: stable;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }
-  html[data-theme="light"] { color-scheme: light; }
-  html[data-theme="dark"] { color-scheme: dark; }
 
   body {
     color: var(--fg);
@@ -193,6 +143,11 @@ export const publicCss = String.raw`
   :target {
     scroll-margin-block-start: calc(var(--header-h) + 2rem);
   }
+
+  /* ── forced-colors mode ── */
+  @media (forced-colors: active) {
+    body::before { display: none; }
+  }
 }
 
 /* ══════════════════════════════════════════════════
@@ -202,18 +157,18 @@ export const publicCss = String.raw`
   .container {
     width: min(100% - 2rem, 1120px);
     margin-inline: auto;
-  }
-  @media (min-width: 600px) {
-    .container { width: min(100% - 3rem, 1120px); }
+    @media (min-width: 600px) {
+      width: min(100% - 3rem, 1120px);
+    }
   }
 
   .content {
     width: min(100% - 2rem, 720px);
     margin-inline: auto;
     padding-block: clamp(3rem, 8vw, 6rem);
-  }
-  @media (min-width: 600px) {
-    .content { width: min(100% - 3rem, 720px); }
+    @media (min-width: 600px) {
+      width: min(100% - 3rem, 720px);
+    }
   }
 
   main { min-height: 70vh; }
@@ -248,6 +203,13 @@ export const publicCss = String.raw`
     color: var(--fg-muted);
     text-wrap: pretty;
   }
+
+  /* lazily-rendered off-screen content gets an intrinsic size hint
+     so scrollbars/layout don't jump before it's measured */
+  .lazy-render {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
 }
 
 /* ══════════════════════════════════════════════════
@@ -255,14 +217,13 @@ export const publicCss = String.raw`
    ══════════════════════════════════════════════════ */
 @layer components {
 
-  /* ── Reading progress bar ── */
+  /* ── Reading progress bar (scroll-driven, no JS) ── */
   .reading-progress {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset-block-start: 0;
+    inset-inline: 0;
     z-index: 30;
     height: 3px;
-    width: 100%;
     background: var(--border-light);
     pointer-events: none;
   }
@@ -275,6 +236,20 @@ export const publicCss = String.raw`
     transform: scaleX(var(--reading-progress));
     transform-origin: left;
     transition: transform .1s linear;
+  }
+  /* progressive enhancement: native scroll-timeline where supported,
+     falls back to the --reading-progress custom-property/JS approach */
+  @supports (animation-timeline: scroll()) {
+    .reading-progress::after {
+      transform: none;
+      transition: none;
+      animation: reading-progress linear;
+      animation-timeline: scroll(root);
+    }
+    @keyframes reading-progress {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
   }
 
   /* ── Skip link ── */
@@ -311,9 +286,11 @@ export const publicCss = String.raw`
     min-height: var(--header-h);
     gap: 1rem;
     padding-block: .5rem;
-  }
-  @media (min-width: 700px) {
-    .site-nav { min-height: 72px; padding-block: 0; gap: 2rem; }
+    @media (min-width: 700px) {
+      min-height: 72px;
+      padding-block: 0;
+      gap: 2rem;
+    }
   }
 
   /* nav group — menus + actions on the right */
@@ -373,9 +350,9 @@ export const publicCss = String.raw`
     align-items: center;
     gap: .6rem;
     flex-shrink: 0;
-  }
-  @media (min-width: 700px) {
-    .nav-actions { gap: 1.2rem; }
+    @media (min-width: 700px) {
+      gap: 1.2rem;
+    }
   }
   .nav-actions .language-link {
     color: var(--fg-muted);
@@ -384,14 +361,12 @@ export const publicCss = String.raw`
     letter-spacing: .05em;
     text-decoration: none;
     transition: color .2s ease;
-  }
-  .nav-actions .language-link:hover { color: var(--accent); }
-  @media (min-width: 700px) {
-    .nav-actions .language-link {
+    @media (min-width: 700px) {
       padding-left: 1.2rem;
       border-left: 1px solid var(--border);
     }
   }
+  .nav-actions .language-link:hover { color: var(--accent); }
 
   /* hamburger */
   .nav-toggle {
@@ -407,9 +382,9 @@ export const publicCss = String.raw`
     cursor: pointer;
     z-index: 60;
     position: relative;
-  }
-  @media (min-width: 700px) {
-    .nav-toggle { display: none; }
+    @media (min-width: 700px) {
+      display: none;
+    }
   }
   .nav-toggle-icon,
   .nav-toggle-icon::before,
@@ -449,14 +424,14 @@ export const publicCss = String.raw`
   /* desktop nav menu (inline) */
   .nav-menu {
     display: none;
-  }
-  @media (min-width: 700px) {
-    .nav-menu {
+    @media (min-width: 700px) {
       display: flex;
       align-items: center;
       gap: 1.6rem;
     }
-    .nav-menu-panel {
+  }
+  .nav-menu-panel {
+    @media (min-width: 700px) {
       display: contents;
     }
   }
@@ -590,9 +565,9 @@ export const publicCss = String.raw`
     width: min(100% - 2rem, 880px);
     margin-inline: auto;
     text-align: center;
-  }
-  @media (min-width: 600px) {
-    .hero-inner { width: min(100% - 3rem, 880px); }
+    @media (min-width: 600px) {
+      width: min(100% - 3rem, 880px);
+    }
   }
   .hero h1 {
     max-width: 850px;
@@ -647,6 +622,10 @@ export const publicCss = String.raw`
     border: 1px solid oklch(62% 0.16 80 / .14);
     border-radius: 50%;
     pointer-events: none;
+    @media (min-width: 760px) {
+      width: 18rem;
+      height: 18rem;
+    }
   }
   .hero-orbit::after {
     content: "";
@@ -654,20 +633,30 @@ export const publicCss = String.raw`
     inset: 1.5rem;
     border: 1px solid oklch(62% 0.16 80 / .10);
     border-radius: 50%;
+    @media (min-width: 760px) {
+      inset: 1.8rem;
+    }
   }
-  .hero-orbit-left  { top: 10%; left: -9rem; }
-  .hero-orbit-right { right: -10rem; bottom: 2%; }
-  @media (min-width: 760px) {
-    .hero-orbit { width: 18rem; height: 18rem; }
-    .hero-orbit::after { inset: 1.8rem; }
-    .hero-orbit-left  { left: -10rem; }
-    .hero-orbit-right { right: -11rem; }
+  .hero-orbit-left  {
+    top: 10%;
+    left: -9rem;
+    @media (min-width: 760px) { left: -10rem; }
+  }
+  .hero-orbit-right {
+    right: -10rem;
+    bottom: 2%;
+    @media (min-width: 760px) { right: -11rem; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-orbit { transition: transform .6s ease; }
   }
 
   /* ── Sections ── */
   .section {
     padding-block: clamp(3.5rem, 8vw, 7rem);
     border-top: 1px solid var(--border);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 600px;
   }
   .section-label {
     display: flex;
@@ -687,9 +676,7 @@ export const publicCss = String.raw`
     flex-direction: column;
     gap: 1rem;
     margin-bottom: 2.2rem;
-  }
-  @media (min-width: 700px) {
-    .section-heading {
+    @media (min-width: 700px) {
       flex-direction: row;
       align-items: flex-end;
       justify-content: space-between;
@@ -716,12 +703,14 @@ export const publicCss = String.raw`
     display: grid;
     grid-template-columns: 1fr;
     gap: 1rem;
-  }
-  @media (min-width: 540px) {
-    .archive-grid { grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
-  }
-  @media (min-width: 900px) {
-    .archive-grid { grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    @media (min-width: 540px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+    }
+    @media (min-width: 900px) {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
   }
 
   .card {
@@ -735,14 +724,16 @@ export const publicCss = String.raw`
     border-radius: var(--radius-md);
     background: var(--bg-card);
     box-shadow: var(--shadow-sm);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 280px;
     transition:
       border-color .25s ease,
       box-shadow .25s ease,
       transform .25s ease,
       background .25s ease;
-  }
-  @media (min-width: 600px) {
-    .card { padding: 2rem; }
+    @media (min-width: 600px) {
+      padding: 2rem;
+    }
   }
   .card::before {
     content: "";
@@ -804,9 +795,7 @@ export const publicCss = String.raw`
     grid-template-columns: 1fr;
     gap: 2rem;
     align-items: center;
-  }
-  @media (min-width: 700px) {
-    .archive-note {
+    @media (min-width: 700px) {
       grid-template-columns: 1.2fr .8fr;
       gap: 4rem;
     }
@@ -909,12 +898,16 @@ export const publicCss = String.raw`
     font-family: var(--serif);
     font-weight: 500;
     line-height: 1.25;
+    scroll-margin-block-start: calc(var(--header-h) + 2rem);
   }
   .markdown h1 { font-size: 2rem; }
   .markdown h2 { font-size: 1.6rem; }
   .markdown h3 { font-size: 1.25rem; }
   .markdown p  { margin-bottom: 1.5rem; }
-  .markdown a  { color: var(--accent); }
+  .markdown a  {
+    color: var(--accent);
+    text-underline-offset: .2em;
+  }
   .markdown a:hover { color: var(--accent-soft); }
   .markdown blockquote {
     margin: 2rem 0;
@@ -938,6 +931,14 @@ export const publicCss = String.raw`
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     aspect-ratio: auto;
+    loading: lazy;
+  }
+  .markdown figure { margin-block: 2rem; }
+  .markdown figcaption {
+    margin-top: .6rem;
+    color: var(--fg-muted);
+    font-size: .85rem;
+    text-align: center;
   }
   .markdown code {
     padding: .15em .4em;
@@ -953,6 +954,7 @@ export const publicCss = String.raw`
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow-x: auto;
+    tab-size: 2;
   }
   .markdown pre code {
     padding: 0;
@@ -1039,11 +1041,16 @@ export const publicCss = String.raw`
     display: grid;
     grid-template-columns: 1fr;
     gap: 1rem;
+    @media (min-width: 600px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+    }
   }
-  @media (min-width: 600px) {
-    .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+  .gallery figure {
+    margin: 0;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 260px;
   }
-  .gallery figure { margin: 0; }
   .gallery img {
     display: block;
     width: 100%;
@@ -1054,6 +1061,7 @@ export const publicCss = String.raw`
     aspect-ratio: 3/2;
     object-fit: cover;
     cursor: zoom-in;
+    loading: lazy;
     transition: opacity .2s ease;
   }
   .gallery figcaption {
@@ -1150,11 +1158,17 @@ export const publicCss = String.raw`
   }
   .lightbox-btn:disabled:hover { background: oklch(100% 0 0 / .12); }
   .lightbox-close { top: 1rem; right: 1rem; }
-  .lightbox-prev { left: .75rem; top: 50%; transform: translateY(-50%); }
-  .lightbox-next { right: .75rem; top: 50%; transform: translateY(-50%); }
-  @media (min-width: 600px) {
-    .lightbox-prev { left: 1.5rem; }
-    .lightbox-next { right: 1.5rem; }
+  .lightbox-prev {
+    left: .75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    @media (min-width: 600px) { left: 1.5rem; }
+  }
+  .lightbox-next {
+    right: .75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    @media (min-width: 600px) { right: 1.5rem; }
   }
 
   /* counter */
@@ -1199,9 +1213,7 @@ export const publicCss = String.raw`
     gap: 1rem;
     padding-bottom: 2rem;
     border-bottom: 1px solid var(--border);
-  }
-  @media (min-width: 700px) {
-    .listing-header {
+    @media (min-width: 700px) {
       flex-direction: row;
       align-items: flex-end;
       justify-content: space-between;
@@ -1231,10 +1243,10 @@ export const publicCss = String.raw`
     gap: .5rem 1rem;
     padding: 1.5rem 0;
     border-bottom: 1px solid var(--border);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 140px;
     transition: background .2s ease;
-  }
-  @media (min-width: 600px) {
-    .listing-card {
+    @media (min-width: 600px) {
       grid-template-columns: 140px 1fr auto;
       gap: 1.5rem;
       padding: 1.8rem 0;
@@ -1244,11 +1256,11 @@ export const publicCss = String.raw`
   .listing-card .post-meta {
     margin: .2rem 0 0;
     grid-row: 1;
+    @media (min-width: 600px) { grid-row: auto; }
   }
-  .listing-card > div { grid-column: 1; }
-  @media (min-width: 600px) {
-    .listing-card .post-meta { grid-row: auto; }
-    .listing-card > div { grid-column: auto; }
+  .listing-card > div {
+    grid-column: 1;
+    @media (min-width: 600px) { grid-column: auto; }
   }
   .listing-card h2 {
     margin-bottom: .4rem;
@@ -1256,9 +1268,7 @@ export const publicCss = String.raw`
     font-size: 1.3rem;
     font-weight: 500;
     line-height: 1.3;
-  }
-  @media (min-width: 600px) {
-    .listing-card h2 { font-size: 1.45rem; }
+    @media (min-width: 600px) { font-size: 1.45rem; }
   }
   .listing-card h2 a { text-decoration: none; }
   .listing-card p {
@@ -1272,9 +1282,7 @@ export const publicCss = String.raw`
     align-self: center;
     color: var(--accent);
     font-size: 1.2rem;
-  }
-  @media (min-width: 600px) {
-    .listing-arrow {
+    @media (min-width: 600px) {
       grid-column: auto;
       grid-row: auto;
     }
@@ -1356,9 +1364,7 @@ export const publicCss = String.raw`
     padding-block: 2rem;
     border-top: 1px solid var(--border);
     color: var(--fg-muted);
-  }
-  @media (min-width: 600px) {
-    .site-footer {
+    @media (min-width: 600px) {
       flex-direction: row;
       justify-content: space-between;
       gap: 2rem;
@@ -1390,6 +1396,10 @@ export const publicCss = String.raw`
     @view-transition {
       navigation: auto;
     }
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: .25s;
+    }
   }
 }
 
@@ -1408,7 +1418,7 @@ export const publicCss = String.raw`
     .site-header, .site-footer, .skip-link, .reading-progress,
     .hero-orbit, .gallery, .pagination, .search-form,
     .button, .breadcrumb, .post-meta {
-      display: none !important;
+      display: none;
     }
     main { min-height: auto; }
     .container, .content {
@@ -1421,6 +1431,7 @@ export const publicCss = String.raw`
       box-shadow: none;
       break-inside: avoid;
       page-break-inside: avoid;
+      content-visibility: visible;
     }
     .markdown a { color: #000; text-decoration: underline; }
     .markdown a::after {
