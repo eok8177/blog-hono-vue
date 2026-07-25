@@ -10,6 +10,8 @@
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": "",
     "TURNSTILE_SITE_KEY": "",
+    "DEV_AUTH_BYPASS": "true",
+    "DEV_AUTH_EMAIL": "admin@example.test",
   },
   "d1_databases": [
     {
