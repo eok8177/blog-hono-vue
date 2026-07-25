@@ -26,7 +26,7 @@ import {
 import { deleteRedirect, listRedirects } from '../../services/redirects';
 import { listSettings, updateSettings } from '../../services/settings';
 import { listAuditLogs } from '../../services/audit-logs';
-import { createUser, deactivateUser, listUsers, updateUser } from '../../services/users';
+import { createUser, deleteUser, getUser, listUsers, updateUser } from '../../services/users';
 import { requireActor, requireAdmin } from '../../middleware/auth';
 import { renderMarkdown } from '../../utils/content';
 import { Layout, Markdown } from '../../views/layout';
@@ -218,14 +218,24 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
     const pagination = paginationSchema.parse(c.req.query());
     return c.json(apiSuccess(await listUsers(c.env, pagination.page, pagination.pageSize)));
   });
+  app.get('/api/admin/users/:id', async (c) => {
+    const user = await getUser(c.env, c.req.param('id'));
+    return user
+      ? c.json(apiSuccess(user))
+      : c.json(apiError('NOT_FOUND', 'Користувача не знайдено'), 404);
+  });
   app.post('/api/admin/users', async (c) => {
     const result = await createUser(c.env, c.get('actor'), await c.req.json());
+    if (result.kind === 'email_taken')
+      return c.json(apiError('EMAIL_TAKEN', 'Користувач із таким email уже існує'), 409);
     return c.json(apiSuccess({ id: result.id }), 201);
   });
   app.put('/api/admin/users/:id', async (c) => {
     const result = await updateUser(c.env, c.get('actor'), c.req.param('id'), await c.req.json());
     if (result.kind === 'missing')
       return c.json(apiError('NOT_FOUND', 'Користувача не знайдено'), 404);
+    if (result.kind === 'email_taken')
+      return c.json(apiError('EMAIL_TAKEN', 'Користувач із таким email уже існує'), 409);
     if (result.kind === 'last_admin')
       return c.json(apiError('LAST_ADMIN', 'Не можна деактивувати останнього active admin'), 422);
     if (result.kind === 'conflict')
@@ -233,14 +243,14 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
     return c.json(apiSuccess({ id: result.id }));
   });
   app.delete('/api/admin/users/:id', async (c) => {
-    const result = await deactivateUser(c.env, c.get('actor'), c.req.param('id'));
+    const result = await deleteUser(c.env, c.get('actor'), c.req.param('id'));
     if (result.kind === 'missing')
       return c.json(apiError('NOT_FOUND', 'Користувача не знайдено'), 404);
+    if (result.kind === 'self_delete')
+      return c.json(apiError('SELF_DELETE', 'Не можна видалити самого себе'), 422);
     if (result.kind === 'last_admin')
-      return c.json(apiError('LAST_ADMIN', 'Не можна деактивувати останнього active admin'), 422);
-    if (result.kind === 'conflict')
-      return c.json(apiError('CONFLICT', 'Користувач змінився під час операції'), 409);
-    return c.json(apiSuccess({ id: result.id, status: 'deactivated' }));
+      return c.json(apiError('LAST_ADMIN', 'Не можна видалити останнього активного адміністратора'), 422);
+    return c.json(apiSuccess({ id: result.id, status: 'deleted' }));
   });
 
   app.get('/api/admin/settings', async (c) => c.json(apiSuccess(await listSettings(c.env))));

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { computed, ref } from 'vue';
+import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { api, ApiError } from '../api/client';
 import AdminPagination from '../components/AdminPagination.vue';
+
 type User = {
   id: string;
   email: string;
@@ -10,7 +11,9 @@ type User = {
   role: 'admin' | 'editor';
   is_active: number;
 };
+
 const client = useQueryClient();
+const error = ref('');
 const page = ref(1);
 const pageSize = 10;
 const users = useQuery({
@@ -22,37 +25,7 @@ const items = computed(() => users.data.value?.items ?? []);
 const totalPages = computed(() =>
   Math.max(1, Math.ceil((users.data.value?.total ?? 0) / pageSize)),
 );
-const selectedId = ref<string>();
-const error = ref('');
-const form = reactive({ email: '', name: '', role: 'editor' as User['role'], isActive: true });
-function edit(user: User) {
-  selectedId.value = user.id;
-  error.value = '';
-  Object.assign(form, {
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    isActive: Boolean(user.is_active),
-  });
-}
-function cancel() {
-  selectedId.value = undefined;
-  error.value = '';
-}
-const save = useMutation({
-  mutationFn: () =>
-    api<{ id: string }>(`/users/${selectedId.value}`, {
-      method: 'PUT',
-      body: JSON.stringify(form),
-    }),
-  onSuccess: async () => {
-    cancel();
-    await client.invalidateQueries({ queryKey: ['users'] });
-  },
-  onError: (cause) => {
-    error.value = cause instanceof ApiError ? cause.message : 'Не вдалося зберегти користувача.';
-  },
-});
+
 async function remove(user: User) {
   if (!confirm(`Видалити користувача «${user.email}»?`)) return;
   error.value = '';
@@ -72,35 +45,9 @@ async function remove(user: User) {
         <h1>Користувачі</h1>
         <p>Керуйте редакторами та адміністраторами архіву.</p>
       </div>
+      <RouterLink class="button" to="/users/new">+ Створити користувача</RouterLink>
     </div>
     <p v-if="error" role="alert">{{ error }}</p>
-    <form v-if="selectedId" class="admin-editor-form" @submit.prevent="save.mutate()">
-      <div class="admin-form-heading">
-        <div>
-          <p class="admin-eyebrow">Профіль</p>
-          <h2>Редагування користувача</h2>
-        </div>
-        <button type="button" class="admin-close-button" @click="cancel">×</button>
-      </div>
-      <div class="admin-form-grid">
-        <label>Email <input v-model="form.email" type="email" required /></label
-        ><label>Ім'я <input v-model="form.name" required /></label
-        ><label
-          >Роль
-          <select v-model="form.role">
-            <option value="editor">Редактор</option>
-            <option value="admin">Адміністратор</option>
-          </select></label
-        ><label class="admin-checkbox"
-          ><input v-model="form.isActive" type="checkbox" /> Активний</label
-        >
-      </div>
-      <div class="admin-form-actions">
-        <button :disabled="save.isPending.value">
-          {{ save.isPending.value ? 'Збереження…' : 'Зберегти' }}</button
-        ><button type="button" class="admin-secondary-button" @click="cancel">Скасувати</button>
-      </div>
-    </form>
     <p v-if="users.isPending.value" class="admin-state">Завантаження…</p>
     <p v-else-if="users.isError.value" class="admin-state" role="alert">
       Немає доступу або не вдалося завантажити список.
@@ -139,24 +86,15 @@ async function remove(user: User) {
               >
             </td>
             <td class="admin-actions-cell">
-              <button
-                type="button"
-                class="admin-row-link"
-                @click="edit(user)"
-              >
-                Редагувати</button
-              ><button type="button" class="admin-danger-button" @click="remove(user)">
+              <RouterLink class="admin-row-link" :to="`/users/${user.id}`">Редагувати</RouterLink>
+              <button type="button" class="admin-danger-button" @click="remove(user)">
                 Видалити
               </button>
             </td>
           </tr>
         </tbody>
       </table>
-      <AdminPagination
-        :page="page"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-      />
+      <AdminPagination :page="page" :total-pages="totalPages" @update:page="page = $event" />
     </div>
   </section>
 </template>

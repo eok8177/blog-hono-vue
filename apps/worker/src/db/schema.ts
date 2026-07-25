@@ -86,7 +86,7 @@ export const media = sqliteTable(
     status: text('status', { enum: ['processing', 'ready', 'failed', 'archived'] })
       .notNull()
       .default('processing'),
-    createdBy: text('created_by').references(() => users.id),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
@@ -116,12 +116,8 @@ export const posts = sqliteTable(
     seoTitleEn: text('seo_title_en'),
     seoDescriptionUk: text('seo_description_uk'),
     seoDescriptionEn: text('seo_description_en'),
-    createdBy: text('created_by')
-      .notNull()
-      .references(() => users.id),
-    updatedBy: text('updated_by')
-      .notNull()
-      .references(() => users.id),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
     revision: integer('revision').notNull().default(0),
     mutationId: text('mutation_id'),
     ...timestamps,
@@ -175,12 +171,8 @@ export const pages = sqliteTable(
     seoTitleEn: text('seo_title_en'),
     seoDescriptionUk: text('seo_description_uk'),
     seoDescriptionEn: text('seo_description_en'),
-    createdBy: text('created_by')
-      .notNull()
-      .references(() => users.id),
-    updatedBy: text('updated_by')
-      .notNull()
-      .references(() => users.id),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
     revision: integer('revision').notNull().default(0),
     mutationId: text('mutation_id'),
     ...timestamps,
@@ -259,7 +251,7 @@ export const categoryMedia = sqliteTable(
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   valueJson: text('value_json').notNull(),
-  updatedBy: text('updated_by').references(() => users.id),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
   updatedAt: text('updated_at').notNull(),
 });
 export const redirects = sqliteTable(
@@ -283,7 +275,7 @@ export const auditLogs = sqliteTable(
   'audit_logs',
   {
     id: text('id').primaryKey(),
-    actorUserId: text('actor_user_id').references(() => users.id),
+    actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
     action: text('action').notNull(),
     entityType: text('entity_type'),
     entityId: text('entity_id'),

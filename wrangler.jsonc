@@ -67,7 +67,7 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "fauna-archive-production-db",
+          "database_name": "fauna-db",
           "database_id": "66a7c636-b34e-4d26-97ce-d9ab210416b6",
           "migrations_dir": "./migrations",
         },
