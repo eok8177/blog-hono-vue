@@ -3,6 +3,7 @@ import { apiError, apiSuccess, ftsPrefixQuery, paginationSchema } from '@fauna/s
 import type { AppEnv } from '../../index';
 import { Layout, SectionLabel } from '../../views/layout';
 import { readNavigation, siteUrl } from './shared';
+import { rateLimit } from '../../utils/rate-limit';
 
 type Locale = 'uk' | 'en';
 type SearchResult = {
@@ -20,6 +21,14 @@ export function registerSearchRoutes(app: Hono<AppEnv>) {
 }
 
 async function searchApi(c: Context<AppEnv>) {
+  // Rate limit: 30 requests per minute per IP
+  const limited = await rateLimit(c, {
+    namespace: 'search',
+    limit: 30,
+    windowSeconds: 60,
+  });
+  if (limited) return limited;
+
   const requestedLocale = c.req.query('locale') ?? 'uk';
   if (requestedLocale !== 'uk' && requestedLocale !== 'en')
     return c.json(apiError('INVALID_LOCALE', 'Підтримуються лише locale uk або en'), 422);

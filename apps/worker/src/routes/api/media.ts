@@ -3,6 +3,7 @@ import { apiError, apiSuccess, mediaBatchMoveSchema, mediaUpdateSchema, paginati
 import type { AppEnv } from '../../index';
 import { requireAdmin } from '../../middleware/auth';
 import { inspectImage, sha256 } from '../../utils/media';
+import { rateLimit } from '../../utils/rate-limit';
 
 export function registerMediaRoutes(app: Hono<AppEnv>) {
   app.get('/api/admin/media', async (c) => {
@@ -183,6 +184,14 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
   });
 
   app.post('/api/admin/media', async (c) => {
+    // Rate limit: 10 uploads per minute per actor
+    const limited = await rateLimit(c, {
+      namespace: 'upload',
+      limit: 10,
+      windowSeconds: 60,
+    });
+    if (limited) return limited;
+
     const contentLength = Number(c.req.header('Content-Length') ?? 0);
     if (contentLength > 21 * 1024 * 1024)
       return c.json(apiError('PAYLOAD_TOO_LARGE', 'Upload не може перевищувати 20 MB'), 413);

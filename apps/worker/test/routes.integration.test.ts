@@ -55,6 +55,12 @@ async function seed() {
     'CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, actor_user_id TEXT, action TEXT NOT NULL, entity_type TEXT, entity_id TEXT, metadata_json TEXT NOT NULL DEFAULT \'{}\', request_id TEXT, created_at TEXT NOT NULL)',
   ).run();
   await env.DB.prepare(
+    'CREATE TABLE IF NOT EXISTS rate_limit_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, namespace TEXT NOT NULL, client_key TEXT NOT NULL, created_at TEXT NOT NULL, request_id TEXT)',
+  ).run();
+  await env.DB.prepare(
+    'CREATE INDEX IF NOT EXISTS rate_limit_ns_ck_ca ON rate_limit_entries(namespace, client_key, created_at)',
+  ).run();
+  await env.DB.prepare(
     'CREATE TABLE IF NOT EXISTS category_media (category_id TEXT NOT NULL, media_id TEXT NOT NULL, role TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY(category_id,media_id))',
   ).run();
   try {
@@ -610,6 +616,43 @@ describe('error responses', () => {
     expect([400, 422, 500]).toContain(r.status);
     const text = await r.text();
     expect(text).not.toContain('Error:');
+  });
+});
+
+// =========================================================================
+// Rate limiting
+// =========================================================================
+describe('rate limiting', () => {
+  it('search API accepts requests within limit', async () => {
+    // First request should work
+    const r = await SELF.fetch('https://example.test/api/search?q=');
+    expect(r.status).toBe(200);
+  });
+
+  it('contact API validates input and requires Turnstile token', async () => {
+    // Without Turnstile token, should fail validation
+    const r = await SELF.fetch('https://example.test/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Test',
+        email: 'test@example.com',
+        subject: 'Test subject',
+        message: 'This is a test message for the contact form.',
+      }),
+    });
+    expect(r.status).toBe(422);
+    const json = await r.json();
+    expect(json.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('contact API rejects empty body', async () => {
+    const r = await SELF.fetch('https://example.test/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(r.status).toBe(422);
   });
 });
 

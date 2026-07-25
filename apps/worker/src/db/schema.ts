@@ -271,6 +271,21 @@ export const redirects = sqliteTable(
     check('redirects_entity_type_check', sql`${t.entityType} IN ('post','page','category')`),
   ],
 );
+export const rateLimitEntries = sqliteTable(
+  'rate_limit_entries',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    namespace: text('namespace').notNull(),
+    clientKey: text('client_key').notNull(),
+    createdAt: text('created_at').notNull(),
+    requestId: text('request_id'),
+  },
+  (t) => [
+    index('rate_limit_namespace_client_key_idx').on(t.namespace, t.clientKey, t.createdAt),
+    index('rate_limit_created_idx').on(t.createdAt),
+  ],
+);
+
 export const auditLogs = sqliteTable(
   'audit_logs',
   {
