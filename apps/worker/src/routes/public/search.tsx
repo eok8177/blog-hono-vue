@@ -104,7 +104,18 @@ async function renderSearchPage(c: Context<AppEnv>, locale: Locale) {
             ? 'Пошук за назвою та змістом опублікованих матеріалів.'
             : 'Search titles and full text across published materials.'}
         </p>
-        <form class="search-form" action={path}>
+        <form
+          class="search-form"
+          action={path}
+          method="get"
+          toolname="searchArchive"
+          tooldescription={
+            locale === 'uk'
+              ? 'Шукає опубліковані матеріали в архіві за запитом.'
+              : 'Searches published materials in the archive by query.'
+          }
+          toolautosubmit
+        >
           <label class="visually-hidden" htmlFor="archive-search">
             {locale === 'uk' ? 'Запит' : 'Query'}
           </label>
@@ -112,6 +123,11 @@ async function renderSearchPage(c: Context<AppEnv>, locale: Locale) {
             class="search-input"
             id="archive-search"
             name="q"
+            toolparamdescription={
+              locale === 'uk'
+                ? 'Ключові слова для пошуку в назвах і текстах опублікованих матеріалів.'
+                : 'Keywords to search across titles and text of published materials.'
+            }
             minLength={2}
             value={rawQuery}
             placeholder={

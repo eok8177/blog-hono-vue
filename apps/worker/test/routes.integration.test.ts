@@ -145,6 +145,7 @@ describe('public routes', () => {
 
   it('homepage renders in Ukrainian', async () => {
     const text = await (await SELF.fetch('https://example.test/')).text();
+    expect(text.startsWith('<!DOCTYPE html>')).toBe(true);
     expect(text).toContain('lang="uk"');
     expect(text).toContain('Фауна');
   });
@@ -173,6 +174,10 @@ describe('public routes', () => {
   it('search page renders', async () => {
     const text = await (await SELF.fetch('https://example.test/search')).text();
     expect(text).toContain('Пошук');
+    expect(text).toContain('toolname="searchArchive"');
+    expect(text).toContain('tooldescription=');
+    expect(text).toContain('toolparamdescription=');
+    expect(text).toContain('toolautosubmit');
   });
 });
 

@@ -42,38 +42,39 @@ export const Layout: FC<{
 }) => {
   const copy = labels[lang];
   return (
-    <html lang={lang}>
-      <Head
-        title={title}
-        nonce={nonce}
-        description={description}
-        canonical={canonical}
-        alternates={alternates}
-        jsonLd={jsonLd}
-        robots={robots}
-        image={image}
-        type={type}
-      />
-      <body>
-        <div class="reading-progress" aria-hidden="true" />
-        <a class="skip-link" href="#main">
-          {lang === 'uk' ? 'Перейти до вмісту' : 'Skip to content'}
-        </a>
-        <Header
-          lang={lang}
-          brand={copy.brand}
-          search={copy.search}
-          languageLabel={copy.language}
-          languageHref={languageHref}
-          menuItems={menuItems}
+    <>
+      {raw('<!DOCTYPE html>')}
+      <html lang={lang}>
+        <Head
+          title={title}
+          nonce={nonce}
+          description={description}
+          canonical={canonical}
+          alternates={alternates}
+          jsonLd={jsonLd}
+          robots={robots}
+          image={image}
+          type={type}
         />
-        <main id="main">{children}</main>
-        <Footer lang={lang} brand={copy.brand} footer={copy.footer} />
-        <Lightbox lang={lang} />
-        <script nonce={nonce}>
-          {raw(inlineScript())}
-        </script>
-      </body>
-    </html>
+        <body>
+          <div class="reading-progress" aria-hidden="true" />
+          <a class="skip-link" href="#main">
+            {lang === 'uk' ? 'Перейти до вмісту' : 'Skip to content'}
+          </a>
+          <Header
+            lang={lang}
+            brand={copy.brand}
+            search={copy.search}
+            languageLabel={copy.language}
+            languageHref={languageHref}
+            menuItems={menuItems}
+          />
+          <main id="main">{children}</main>
+          <Footer lang={lang} brand={copy.brand} footer={copy.footer} />
+          <Lightbox lang={lang} />
+          <script nonce={nonce}>{raw(inlineScript())}</script>
+        </body>
+      </html>
+    </>
   );
 };
