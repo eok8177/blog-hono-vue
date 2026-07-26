@@ -26,6 +26,18 @@ export const slugSchema = z
     'Slug має містити лише малі латинські літери, цифри й дефіси',
   )
   .refine((value) => !reservedSlugs.has(value), 'Цей slug зарезервований');
+
+/**
+ * Optional slug: preprocess converts null / empty-string / whitespace-only to
+ * undefined so the field auto-generates.  Absent keys stay undefined.
+ */
+export const optionalSlugSchema = z.preprocess(
+  (v) =>
+    v === null || v === undefined || (typeof v === 'string' && v.trim() === '')
+      ? undefined
+      : v,
+  slugSchema.optional(),
+);
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -36,7 +48,7 @@ const optionalRevisionSchema = z.preprocess(
 );
 export const postInputSchema = z
   .object({
-    slug: slugSchema,
+    slug: optionalSlugSchema,
     titleUk: z.string().trim().min(1).max(250),
     titleEn: z.string().trim().max(250).nullable().optional(),
     excerptUk: z.string().max(1000).nullable().optional(),
@@ -64,7 +76,7 @@ export const postInputSchema = z
 export type PostInput = z.infer<typeof postInputSchema>;
 const translatedPublication = z
   .object({
-    slug: slugSchema,
+    slug: optionalSlugSchema,
     titleUk: z.string().trim().min(1).max(250),
     titleEn: z.string().trim().max(250).nullable().optional(),
     bodyMdUk: z.string().min(1),
@@ -93,7 +105,7 @@ export const pageInputSchema = translatedPublication.extend({
 });
 export const categoryInputSchema = z
   .object({
-    slug: slugSchema,
+    slug: optionalSlugSchema,
     parentId: z.string().uuid().nullable().optional(),
     titleUk: z.string().trim().min(1).max(250),
     titleEn: z.string().trim().max(250).nullable().optional(),

@@ -1,6 +1,13 @@
 import { categoryInputSchema } from '@fauna/shared';
 import type { Actor, Bindings } from '../env';
 import type { MutationResult } from './mutation';
+import {
+  baseSlug,
+  ensureUniqueSlug,
+  isSlugUniqueConstraint,
+  resolveSlug,
+  SlugTakenError,
+} from '../utils/slug';
 
 type Pagination = { page: number; pageSize: number };
 
@@ -47,32 +54,55 @@ async function categoryCreatesCycle(
 export async function createCategory(env: Bindings, body: unknown): Promise<MutationResult> {
   const data = categoryInputSchema.parse(body);
   if (await categoryCreatesCycle(env, undefined, data.parentId ?? null)) return { kind: 'cycle' };
-  const collision = await env.DB.prepare('SELECT id FROM categories WHERE slug=?')
-    .bind(data.slug)
-    .first();
-  if (collision) return { kind: 'slug_taken' };
+
+  let slug: string;
+  let generated: boolean;
+  try {
+    const resolved = await resolveSlug(env, 'categories', body, data.slug, true);
+    slug = resolved.slug!;
+    generated = resolved.generated;
+  } catch (e) {
+    if (e instanceof SlugTakenError) return { kind: 'slug_taken' };
+    throw e;
+  }
 
   const timestamp = new Date().toISOString();
   const id = crypto.randomUUID();
-  await env.DB.prepare(
-    'INSERT INTO categories(id,parent_id,slug,title_uk,title_en,description_md_uk,description_md_en,status,is_en_published,show_in_menu,menu_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
-  )
-    .bind(
-      id,
-      data.parentId ?? null,
-      data.slug,
-      data.titleUk,
-      data.titleEn ?? null,
-      data.descriptionMdUk ?? null,
-      data.descriptionMdEn ?? null,
-      data.status,
-      Number(data.status === 'archived' ? false : data.isEnPublished),
-      Number(data.showInMenu),
-      data.menuOrder,
-      timestamp,
-      timestamp,
-    )
-    .run();
+
+  // Retry loop — guards against race condition between slug check and INSERT.
+  for (let attempt = 0; attempt <= 5; attempt++) {
+    try {
+      await env.DB.prepare(
+        'INSERT INTO categories(id,parent_id,slug,title_uk,title_en,description_md_uk,description_md_en,status,is_en_published,show_in_menu,menu_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      )
+        .bind(
+          id,
+          data.parentId ?? null,
+          slug,
+          data.titleUk,
+          data.titleEn ?? null,
+          data.descriptionMdUk ?? null,
+          data.descriptionMdEn ?? null,
+          data.status,
+          Number(data.status === 'archived' ? false : data.isEnPublished),
+          Number(data.showInMenu),
+          data.menuOrder,
+          timestamp,
+          timestamp,
+        )
+        .run();
+      return { kind: 'ok', id };
+    } catch (e: unknown) {
+      if (isSlugUniqueConstraint(e, 'categories')) {
+        if (!generated) return { kind: 'slug_taken' };
+        if (attempt < 5) {
+          slug = await ensureUniqueSlug(env, 'categories', baseSlug(data.titleUk));
+          continue;
+        }
+      }
+      throw e;
+    }
+  }
   return { kind: 'ok', id };
 }
 
@@ -91,6 +121,15 @@ export async function updateCategory(
     .first<{ slug: string; status: string; revision: number }>();
   if (!old) return { kind: 'missing' };
 
+  let slug: string;
+  try {
+    const resolved = await resolveSlug(env, 'categories', body, data.slug, false, categoryId);
+    slug = resolved.slug ?? old.slug;
+  } catch (e) {
+    if (e instanceof SlugTakenError) return { kind: 'slug_taken' };
+    throw e;
+  }
+
   const timestamp = new Date().toISOString();
   const mutationId = crypto.randomUUID();
   const nextRevision = data.version + 1;
@@ -101,7 +140,7 @@ export async function updateCategory(
       'UPDATE categories SET parent_id=?,slug=?,title_uk=?,title_en=?,description_md_uk=?,description_md_en=?,status=?,is_en_published=?,show_in_menu=?,menu_order=?,updated_at=?,revision=revision+1,mutation_id=? WHERE id=? AND revision=?',
     ).bind(
       data.parentId ?? null,
-      data.slug,
+      slug,
       data.titleUk,
       data.titleEn ?? null,
       data.descriptionMdUk ?? null,
@@ -125,19 +164,19 @@ export async function updateCategory(
       old.status === data.status ? 'category.update' : 'category.status_change',
       'category',
       categoryId,
-      JSON.stringify({ slug: data.slug, status: data.status, previousStatus: old.status }),
+      JSON.stringify({ slug, status: data.status, previousStatus: old.status }),
       timestamp,
       ...guardArgs,
     ),
   );
-  if (old.slug !== data.slug) {
+  if (old.slug !== slug) {
     changes.push(
       env.DB.prepare(
         `UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='category' AND entity_id=? AND ${guard}`,
-      ).bind(`/en/category/${data.slug}`, `/category/${data.slug}`, categoryId, ...guardArgs),
+      ).bind(`/en/category/${slug}`, `/category/${slug}`, categoryId, ...guardArgs),
       env.DB.prepare(`DELETE FROM redirects WHERE old_path IN (?,?) AND ${guard}`).bind(
-        `/category/${data.slug}`,
-        `/en/category/${data.slug}`,
+        `/category/${slug}`,
+        `/en/category/${slug}`,
         ...guardArgs,
       ),
       env.DB.prepare(
@@ -145,7 +184,7 @@ export async function updateCategory(
       ).bind(
         crypto.randomUUID(),
         `/category/${old.slug}`,
-        `/category/${data.slug}`,
+        `/category/${slug}`,
         301,
         'category',
         categoryId,
@@ -157,7 +196,7 @@ export async function updateCategory(
       ).bind(
         crypto.randomUUID(),
         `/en/category/${old.slug}`,
-        `/en/category/${data.slug}`,
+        `/en/category/${slug}`,
         301,
         'category',
         categoryId,

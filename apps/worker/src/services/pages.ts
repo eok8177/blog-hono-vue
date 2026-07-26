@@ -1,6 +1,13 @@
 import { pageInputSchema } from '@fauna/shared';
 import type { Actor, Bindings } from '../env';
 import type { MutationResult } from './mutation';
+import {
+  baseSlug,
+  ensureUniqueSlug,
+  isSlugUniqueConstraint,
+  resolveSlug,
+  SlugTakenError,
+} from '../utils/slug';
 
 type Pagination = { page: number; pageSize: number };
 
@@ -39,39 +46,62 @@ export async function createPage(
   body: unknown,
 ): Promise<MutationResult> {
   const data = pageInputSchema.parse(body);
-  const collision = await env.DB.prepare('SELECT id FROM pages WHERE slug=?')
-    .bind(data.slug)
-    .first();
-  if (collision) return { kind: 'slug_taken' };
+
+  let slug: string;
+  let generated: boolean;
+  try {
+    const resolved = await resolveSlug(env, 'pages', body, data.slug, true);
+    slug = resolved.slug!;
+    generated = resolved.generated;
+  } catch (e) {
+    if (e instanceof SlugTakenError) return { kind: 'slug_taken' };
+    throw e;
+  }
 
   const timestamp = new Date().toISOString();
   const id = crypto.randomUUID();
-  await env.DB.prepare(
-    'INSERT INTO pages(id,slug,template,title_uk,title_en,body_md_uk,body_md_en,status,is_en_published,published_at,show_in_menu,menu_order,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-  )
-    .bind(
-      id,
-      data.slug,
-      data.template,
-      data.titleUk,
-      data.titleEn ?? null,
-      data.bodyMdUk,
-      data.bodyMdEn ?? null,
-      data.status,
-      Number(data.status === 'archived' ? false : data.isEnPublished),
-      data.status === 'published' ? timestamp : null,
-      Number(data.showInMenu),
-      data.menuOrder,
-      data.seoTitleUk ?? null,
-      data.seoTitleEn ?? null,
-      data.seoDescriptionUk ?? null,
-      data.seoDescriptionEn ?? null,
-      actor.id,
-      actor.id,
-      timestamp,
-      timestamp,
-    )
-    .run();
+
+  // Retry loop — guards against race condition between slug check and INSERT.
+  for (let attempt = 0; attempt <= 5; attempt++) {
+    try {
+      await env.DB.prepare(
+        'INSERT INTO pages(id,slug,template,title_uk,title_en,body_md_uk,body_md_en,status,is_en_published,published_at,show_in_menu,menu_order,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      )
+        .bind(
+          id,
+          slug,
+          data.template,
+          data.titleUk,
+          data.titleEn ?? null,
+          data.bodyMdUk,
+          data.bodyMdEn ?? null,
+          data.status,
+          Number(data.status === 'archived' ? false : data.isEnPublished),
+          data.status === 'published' ? timestamp : null,
+          Number(data.showInMenu),
+          data.menuOrder,
+          data.seoTitleUk ?? null,
+          data.seoTitleEn ?? null,
+          data.seoDescriptionUk ?? null,
+          data.seoDescriptionEn ?? null,
+          actor.id,
+          actor.id,
+          timestamp,
+          timestamp,
+        )
+        .run();
+      break;
+    } catch (e: unknown) {
+      if (isSlugUniqueConstraint(e, 'pages')) {
+        if (!generated) return { kind: 'slug_taken' };
+        if (attempt < 5) {
+          slug = await ensureUniqueSlug(env, 'pages', baseSlug(data.titleUk));
+          continue;
+        }
+      }
+      throw e;
+    }
+  }
 
   // Sync page_media
   if (data.mediaIds.length) {
@@ -102,6 +132,15 @@ export async function updatePage(
     .first<{ slug: string; status: string; revision: number }>();
   if (!old) return { kind: 'missing' };
 
+  let slug: string;
+  try {
+    const resolved = await resolveSlug(env, 'pages', body, data.slug, false, pageId);
+    slug = resolved.slug ?? old.slug;
+  } catch (e) {
+    if (e instanceof SlugTakenError) return { kind: 'slug_taken' };
+    throw e;
+  }
+
   const timestamp = new Date().toISOString();
   const mutationId = crypto.randomUUID();
   const nextRevision = data.version + 1;
@@ -111,7 +150,7 @@ export async function updatePage(
     env.DB.prepare(
       "UPDATE pages SET slug=?,template=?,title_uk=?,title_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END,show_in_menu=?,menu_order=?,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=?,revision=revision+1,mutation_id=? WHERE id=? AND revision=?",
     ).bind(
-      data.slug,
+      slug,
       data.template,
       data.titleUk,
       data.titleEn ?? null,
@@ -155,19 +194,19 @@ export async function updatePage(
       old.status === data.status ? 'page.update' : 'page.status_change',
       'page',
       pageId,
-      JSON.stringify({ slug: data.slug, status: data.status, previousStatus: old.status }),
+      JSON.stringify({ slug, status: data.status, previousStatus: old.status }),
       timestamp,
       ...guardArgs,
     ),
   );
-  if (old.slug !== data.slug) {
+  if (old.slug !== slug) {
     changes.push(
       env.DB.prepare(
         `UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='page' AND entity_id=? AND ${guard}`,
-      ).bind(`/en/${data.slug}`, `/${data.slug}`, pageId, ...guardArgs),
+      ).bind(`/en/${slug}`, `/${slug}`, pageId, ...guardArgs),
       env.DB.prepare(`DELETE FROM redirects WHERE old_path IN (?,?) AND ${guard}`).bind(
-        `/${data.slug}`,
-        `/en/${data.slug}`,
+        `/${slug}`,
+        `/en/${slug}`,
         ...guardArgs,
       ),
       env.DB.prepare(
@@ -175,7 +214,7 @@ export async function updatePage(
       ).bind(
         crypto.randomUUID(),
         `/${old.slug}`,
-        `/${data.slug}`,
+        `/${slug}`,
         301,
         'page',
         pageId,
@@ -187,7 +226,7 @@ export async function updatePage(
       ).bind(
         crypto.randomUUID(),
         `/en/${old.slug}`,
-        `/en/${data.slug}`,
+        `/en/${slug}`,
         301,
         'page',
         pageId,

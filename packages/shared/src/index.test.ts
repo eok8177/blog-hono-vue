@@ -3,6 +3,7 @@ import {
   ftsPrefixQuery,
   localeFromPath,
   normalizeSlug,
+  optionalSlugSchema,
   slugSchema,
   paginationSchema,
   postInputSchema,
@@ -92,6 +93,45 @@ describe('slugSchema – reserved slugs', () => {
     expect(slugSchema.safeParse('a').success).toBe(true);
     expect(slugSchema.safeParse('123').success).toBe(true);
     expect(slugSchema.safeParse('z'.repeat(120)).success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2b. Optional slug schema (used in create/update DTOs)
+// ---------------------------------------------------------------------------
+describe('optionalSlugSchema', () => {
+  it('accepts a valid slug string', () => {
+    expect(optionalSlugSchema.safeParse('valid-slug').success).toBe(true);
+  });
+
+  it('accepts undefined (slug not in body)', () => {
+    expect(optionalSlugSchema.safeParse(undefined).success).toBe(true);
+  });
+
+  it('converts null to undefined → passes', () => {
+    const result = optionalSlugSchema.safeParse(null);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBeUndefined();
+  });
+
+  it('converts empty string to undefined → passes', () => {
+    const result = optionalSlugSchema.safeParse('');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBeUndefined();
+  });
+
+  it('converts whitespace-only to undefined → passes', () => {
+    const result = optionalSlugSchema.safeParse('   ');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBeUndefined();
+  });
+
+  it('rejects a reserved slug', () => {
+    expect(optionalSlugSchema.safeParse('admin').success).toBe(false);
+  });
+
+  it('rejects uppercase slug', () => {
+    expect(optionalSlugSchema.safeParse('Bad-Slug').success).toBe(false);
   });
 });
 
@@ -223,6 +263,25 @@ describe('postInputSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts post without slug (auto-generate)', () => {
+    const { slug, ...withoutSlug } = validPost();
+    const result = postInputSchema.safeParse(withoutSlug);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
+  });
+
+  it('accepts post with empty slug → undefined', () => {
+    const result = postInputSchema.safeParse({ ...validPost(), slug: '' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
+  });
+
+  it('accepts post with null slug → undefined', () => {
+    const result = postInputSchema.safeParse({ ...validPost(), slug: null });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
+  });
+
   it('rejects more than 20 categories', () => {
     const result = postInputSchema.safeParse({
       ...validPost(),
@@ -277,8 +336,8 @@ describe('pageInputSchema', () => {
       slug: 'about',
       titleUk: 'Про архів',
       bodyMdUk: 'Текст',
-      // @ts-expect-error testing invalid enum
-      template: 'gallery',
+      // testing invalid enum
+      template: 'gallery' as string,
     });
     expect(result.success).toBe(false);
   });
@@ -291,6 +350,35 @@ describe('pageInputSchema', () => {
       isEnPublished: true,
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts page without slug (auto-generate)', () => {
+    const result = pageInputSchema.safeParse({
+      titleUk: 'Про архів',
+      bodyMdUk: 'Текст',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
+  });
+
+  it('accepts page with empty slug → undefined', () => {
+    const result = pageInputSchema.safeParse({
+      slug: '',
+      titleUk: 'Про архів',
+      bodyMdUk: 'Текст',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
+  });
+
+  it('accepts page with null slug → undefined', () => {
+    const result = pageInputSchema.safeParse({
+      slug: null,
+      titleUk: 'Про архів',
+      bodyMdUk: 'Текст',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
   });
 
   it('accepts showInMenu and menuOrder', () => {
@@ -325,6 +413,32 @@ describe('categoryInputSchema', () => {
       isEnPublished: true,
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts category without slug (auto-generate)', () => {
+    const result = categoryInputSchema.safeParse({
+      titleUk: 'Дослідження',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
+  });
+
+  it('accepts category with empty slug → undefined', () => {
+    const result = categoryInputSchema.safeParse({
+      slug: '',
+      titleUk: 'Дослідження',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
+  });
+
+  it('accepts category with null slug → undefined', () => {
+    const result = categoryInputSchema.safeParse({
+      slug: null,
+      titleUk: 'Дослідження',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.slug).toBeUndefined();
   });
 
   it('rejects menuOrder over 10000', () => {
@@ -449,8 +563,8 @@ describe('userInputSchema', () => {
     const result = userInputSchema.safeParse({
       email: 'admin@example.com',
       name: 'Admin',
-      // @ts-expect-error testing invalid enum
-      role: 'superadmin',
+      // testing invalid enum
+      role: 'superadmin' as string,
     });
     expect(result.success).toBe(false);
   });
@@ -506,8 +620,8 @@ describe('settingInputSchema', () => {
 
   it('rejects unknown setting key', () => {
     const result = settingInputSchema.safeParse({
-      // @ts-expect-error testing invalid key
-      key: 'unknown',
+      // testing invalid key
+      key: 'unknown' as string,
       value: {},
     });
     expect(result.success).toBe(false);

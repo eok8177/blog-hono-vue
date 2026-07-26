@@ -1,6 +1,7 @@
 import { postInputSchema, type Locale } from '@fauna/shared';
 import { now } from '../utils/content';
 import type { Bindings, Actor } from '../env';
+import { isSlugUniqueConstraint, resolveSlug, SlugTakenError } from '../utils/slug';
 
 type Pagination = { page: number; pageSize: number };
 
@@ -115,138 +116,168 @@ export async function savePost(env: Bindings, actor: Actor, id: string | undefin
   if (data.status === 'published' && (!data.titleUk.trim() || !data.bodyMdUk.trim()))
     return { kind: 'invalid' as const };
 
+  const isCreate = !id;
   const postId = id ?? crypto.randomUUID();
   const isEnPublished = data.status === 'archived' ? false : data.isEnPublished;
-  const mutationId = crypto.randomUUID();
   const nextRevision = (data.version ?? -1) + 1;
-  const statement = id
-    ? env.DB.prepare(
-        `UPDATE posts SET slug=?,title_uk=?,title_en=?,excerpt_uk=?,excerpt_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=?,revision=revision+1,mutation_id=? WHERE id=? AND revision=?`,
-      ).bind(
-        data.slug,
-        data.titleUk,
-        data.titleEn ?? null,
-        data.excerptUk ?? null,
-        data.excerptEn ?? null,
-        data.bodyMdUk,
-        data.bodyMdEn ?? null,
-        data.status,
-        Number(isEnPublished),
-        data.status,
-        timestamp,
-        data.seoTitleUk ?? null,
-        data.seoTitleEn ?? null,
-        data.seoDescriptionUk ?? null,
-        data.seoDescriptionEn ?? null,
-        actor.id,
-        timestamp,
-        mutationId,
-        postId,
-        data.version,
-      )
-    : env.DB.prepare(
-        `INSERT INTO posts (id,slug,title_uk,title_en,excerpt_uk,excerpt_en,body_md_uk,body_md_en,status,is_en_published,published_at,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at,revision,mutation_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      ).bind(
-        postId,
-        data.slug,
-        data.titleUk,
-        data.titleEn ?? null,
-        data.excerptUk ?? null,
-        data.excerptEn ?? null,
-        data.bodyMdUk,
-        data.bodyMdEn ?? null,
-        data.status,
-        Number(isEnPublished),
-        data.status === 'published' ? timestamp : null,
-        data.seoTitleUk ?? null,
-        data.seoTitleEn ?? null,
-        data.seoDescriptionUk ?? null,
-        data.seoDescriptionEn ?? null,
-        actor.id,
-        actor.id,
-        timestamp,
-        timestamp,
-        0,
-        mutationId,
-      );
 
-  const statements: D1PreparedStatement[] = [statement];
-  const guard = mutationGuard('posts', postId, id ? nextRevision : 0, mutationId);
-  statements.push(
-    env.DB.prepare(`DELETE FROM post_categories WHERE post_id=? AND ${guard.sql}`).bind(
-      postId,
-      ...guard.bindings,
-    ),
-    ...data.categoryIds.map((categoryId) =>
-      env.DB.prepare(
-        `INSERT INTO post_categories(post_id,category_id,created_at) SELECT ?,?,? WHERE ${guard.sql}`,
-      ).bind(postId, categoryId, timestamp, ...guard.bindings),
-    ),
-    env.DB.prepare(`DELETE FROM post_media WHERE post_id=? AND ${guard.sql}`).bind(
-      postId,
-      ...guard.bindings,
-    ),
-    ...data.mediaIds.map((mediaId, position) =>
-      env.DB.prepare(
-        `INSERT INTO post_media(post_id,media_id,role,position) SELECT ?,?,?,? WHERE ${guard.sql}`,
-      ).bind(postId, mediaId, 'gallery', position, ...guard.bindings),
-    ),
-  );
+  // Retry loop for creates — guards UNIQUE constraint race on slug.
+  const maxRetries = isCreate ? 5 : 0;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const mutationId = crypto.randomUUID();
 
-  if (existing && existing.slug !== data.slug) {
-    const aliases = [
-      { oldPath: `/post/${existing.slug}`, newPath: `/post/${data.slug}` },
-      { oldPath: `/en/post/${existing.slug}`, newPath: `/en/post/${data.slug}` },
-    ];
+    let slug: string;
+    let generated: boolean;
+    try {
+      const resolved = await resolveSlug(env, 'posts', body, data.slug, isCreate, id);
+      slug = resolved.slug ?? existing?.slug ?? '';
+      generated = resolved.generated;
+    } catch (e) {
+      if (e instanceof SlugTakenError) return { kind: 'slug_taken' as const };
+      throw e;
+    }
+
+    const statement = id
+      ? env.DB.prepare(
+          `UPDATE posts SET slug=?,title_uk=?,title_en=?,excerpt_uk=?,excerpt_en=?,body_md_uk=?,body_md_en=?,status=?,is_en_published=?,published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END,seo_title_uk=?,seo_title_en=?,seo_description_uk=?,seo_description_en=?,updated_by=?,updated_at=?,revision=revision+1,mutation_id=? WHERE id=? AND revision=?`,
+        ).bind(
+          slug,
+          data.titleUk,
+          data.titleEn ?? null,
+          data.excerptUk ?? null,
+          data.excerptEn ?? null,
+          data.bodyMdUk,
+          data.bodyMdEn ?? null,
+          data.status,
+          Number(isEnPublished),
+          data.status,
+          timestamp,
+          data.seoTitleUk ?? null,
+          data.seoTitleEn ?? null,
+          data.seoDescriptionUk ?? null,
+          data.seoDescriptionEn ?? null,
+          actor.id,
+          timestamp,
+          mutationId,
+          postId,
+          data.version,
+        )
+      : env.DB.prepare(
+          `INSERT INTO posts (id,slug,title_uk,title_en,excerpt_uk,excerpt_en,body_md_uk,body_md_en,status,is_en_published,published_at,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at,revision,mutation_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        ).bind(
+          postId,
+          slug,
+          data.titleUk,
+          data.titleEn ?? null,
+          data.excerptUk ?? null,
+          data.excerptEn ?? null,
+          data.bodyMdUk,
+          data.bodyMdEn ?? null,
+          data.status,
+          Number(isEnPublished),
+          data.status === 'published' ? timestamp : null,
+          data.seoTitleUk ?? null,
+          data.seoTitleEn ?? null,
+          data.seoDescriptionUk ?? null,
+          data.seoDescriptionEn ?? null,
+          actor.id,
+          actor.id,
+          timestamp,
+          timestamp,
+          0,
+          mutationId,
+        );
+
+    const statements: D1PreparedStatement[] = [statement];
+    const guard = mutationGuard('posts', postId, id ? nextRevision : 0, mutationId);
     statements.push(
-      env.DB.prepare(`DELETE FROM redirects WHERE old_path IN (?,?) AND ${guard.sql}`).bind(
-        `/post/${data.slug}`,
-        `/en/post/${data.slug}`,
+      env.DB.prepare(`DELETE FROM post_categories WHERE post_id=? AND ${guard.sql}`).bind(
+        postId,
         ...guard.bindings,
       ),
-      env.DB.prepare(
-        `UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='post' AND entity_id=? AND ${guard.sql}`,
-      ).bind(`/en/post/${data.slug}`, `/post/${data.slug}`, postId, ...guard.bindings),
-      ...aliases.map((alias) =>
+      ...data.categoryIds.map((categoryId) =>
         env.DB.prepare(
-          `INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard.sql}`,
-        ).bind(
-          crypto.randomUUID(),
-          alias.oldPath,
-          alias.newPath,
-          301,
-          'post',
-          postId,
-          timestamp,
-          ...guard.bindings,
-        ),
+          `INSERT INTO post_categories(post_id,category_id,created_at) SELECT ?,?,? WHERE ${guard.sql}`,
+        ).bind(postId, categoryId, timestamp, ...guard.bindings),
+      ),
+      env.DB.prepare(`DELETE FROM post_media WHERE post_id=? AND ${guard.sql}`).bind(
+        postId,
+        ...guard.bindings,
+      ),
+      ...data.mediaIds.map((mediaId, position) =>
+        env.DB.prepare(
+          `INSERT INTO post_media(post_id,media_id,role,position) SELECT ?,?,?,? WHERE ${guard.sql}`,
+        ).bind(postId, mediaId, 'gallery', position, ...guard.bindings),
       ),
     );
+
+    if (existing && existing.slug !== slug) {
+      const aliases = [
+        { oldPath: `/post/${existing.slug}`, newPath: `/post/${slug}` },
+        { oldPath: `/en/post/${existing.slug}`, newPath: `/en/post/${slug}` },
+      ];
+      statements.push(
+        env.DB.prepare(`DELETE FROM redirects WHERE old_path IN (?,?) AND ${guard.sql}`).bind(
+          `/post/${slug}`,
+          `/en/post/${slug}`,
+          ...guard.bindings,
+        ),
+        env.DB.prepare(
+          `UPDATE redirects SET new_path=CASE WHEN old_path LIKE '/en/%' THEN ? ELSE ? END WHERE entity_type='post' AND entity_id=? AND ${guard.sql}`,
+        ).bind(`/en/post/${slug}`, `/post/${slug}`, postId, ...guard.bindings),
+        ...aliases.map((alias) =>
+          env.DB.prepare(
+            `INSERT INTO redirects(id,old_path,new_path,status_code,entity_type,entity_id,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard.sql}`,
+          ).bind(
+            crypto.randomUUID(),
+            alias.oldPath,
+            alias.newPath,
+            301,
+            'post',
+            postId,
+            timestamp,
+            ...guard.bindings,
+          ),
+        ),
+      );
+    }
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard.sql}`,
+      ).bind(
+        crypto.randomUUID(),
+        actor.id,
+        id && existing?.status !== data.status
+          ? 'post.status_change'
+          : id
+            ? 'post.update'
+            : 'post.create',
+        'post',
+        postId,
+        JSON.stringify({
+          slug,
+          status: data.status,
+          previousStatus: existing?.status ?? null,
+          englishPublished: isEnPublished,
+        }),
+        timestamp,
+        ...guard.bindings,
+      ),
+    );
+
+    try {
+      const results = await env.DB.batch(statements);
+      if (id && !results[0]?.meta.changes) return { kind: 'conflict' as const };
+      return { kind: 'ok' as const, id: postId, revision: id ? nextRevision : 0 };
+    } catch (e: unknown) {
+      if (isCreate && isSlugUniqueConstraint(e, 'posts')) {
+        if (!generated) return { kind: 'slug_taken' as const };
+        if (attempt < maxRetries) continue;
+      }
+      throw e;
+    }
   }
-  statements.push(
-    env.DB.prepare(
-      `INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) SELECT ?,?,?,?,?,?,? WHERE ${guard.sql}`,
-    ).bind(
-      crypto.randomUUID(),
-      actor.id,
-      id && existing?.status !== data.status
-        ? 'post.status_change'
-        : id
-          ? 'post.update'
-          : 'post.create',
-      'post',
-      postId,
-      JSON.stringify({
-        slug: data.slug,
-        status: data.status,
-        previousStatus: existing?.status ?? null,
-        englishPublished: isEnPublished,
-      }),
-      timestamp,
-      ...guard.bindings,
-    ),
-  );
-  const results = await env.DB.batch(statements);
-  if (id && !results[0]?.meta.changes) return { kind: 'conflict' as const };
-  return { kind: 'ok' as const, id: postId, revision: id ? nextRevision : 0 };
+
+  // Should never reach here, but satisfies TypeScript.
+  return { kind: 'ok' as const, id: postId, revision: 0 };
 }

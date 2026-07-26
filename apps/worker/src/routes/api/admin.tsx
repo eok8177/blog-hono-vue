@@ -77,6 +77,8 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
     const saved = await savePost(c.env, c.get('actor'), undefined, await c.req.json());
     if (saved.kind === 'invalid')
       return c.json(apiError('VALIDATION_ERROR', 'Матеріал не готовий до публікації'), 422);
+    if (saved.kind === 'slug_taken')
+      return c.json(apiError('SLUG_TAKEN', 'Такий slug уже використовується. Вкажіть інший.'), 409);
     return c.json(apiSuccess(saved), 201);
   });
   app.put('/api/admin/posts/:id', async (c) => {
@@ -86,6 +88,8 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       return c.json(apiError('VALIDATION_ERROR', 'Для оновлення потрібна актуальна version'), 422);
     if (saved.kind === 'conflict')
       return c.json(apiError('CONFLICT', 'Матеріал змінив інший редактор'), 409);
+    if (saved.kind === 'slug_taken')
+      return c.json(apiError('SLUG_TAKEN', 'Такий slug уже використовується. Вкажіть інший.'), 409);
     return c.json(apiSuccess(saved));
   });
   app.delete('/api/admin/posts/:id', async (c) => {
@@ -203,6 +207,8 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
       return c.json(apiError('NOT_FOUND', 'Сторінку не знайдено'), 404);
     if (result.kind === 'conflict')
       return c.json(apiError('CONFLICT', 'Сторінка змінилася або не існує'), 409);
+    if (result.kind === 'slug_taken')
+      return c.json(apiError('SLUG_TAKEN', 'Такий slug уже використовується. Вкажіть інший.'), 409);
     return c.json(
       apiSuccess({ id: result.id, updatedAt: result.updatedAt, revision: result.revision }),
     );

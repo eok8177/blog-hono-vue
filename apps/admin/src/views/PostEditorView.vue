@@ -137,7 +137,7 @@ async function save() {
     <p v-if="loading" class="admin-state">Завантаження…</p>
     <form v-else class="admin-editor-form" @submit.prevent="save">
       <p v-if="error" role="alert">{{ error }}</p>
-      <label>Slug <input v-model="form.slug" required pattern="[a-z0-9-]+" /></label>
+      <label>Slug <input v-model="form.slug" pattern="[a-z0-9-]+" /><small v-if="!form.slug.trim()">Згенерується з назви автоматично</small></label>
       <div class="admin-editor-columns">
         <label>Український заголовок <input v-model="form.titleUk" required /></label
         ><label>English title <input v-model="form.titleEn" /></label>
