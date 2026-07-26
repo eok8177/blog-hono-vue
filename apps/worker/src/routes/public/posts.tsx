@@ -3,6 +3,7 @@ import type { AppEnv } from '../../index';
 import { findPost } from '../../services/posts';
 import { renderMarkdown } from '../../utils/content';
 import { Layout, Markdown } from '../../views/layout';
+import { articleJsonLd, firstText, textSummary } from './seo';
 import { findRedirect, readNavigation, siteUrl } from './shared';
 
 type Locale = 'uk' | 'en';
@@ -41,26 +42,42 @@ async function renderPost(c: Context<AppEnv>, locale: Locale) {
   const ukHref = `${base}${ukPath}`;
   const enHref = `${base}${enPath}`;
   const hasEnglish = Number(post.is_en_published) === 1;
+  const metaTitle = firstText(post[locale === 'en' ? 'seo_title_en' : 'seo_title_uk'], title);
+  const description = textSummary(
+    post[locale === 'en' ? 'seo_description_en' : 'seo_description_uk'],
+    firstText(post[locale === 'en' ? 'excerpt_en' : 'excerpt_uk'], body),
+  );
+  const image = gallery.results[0] ? `${base}/media/${gallery.results[0].id}/1600` : undefined;
   const menuItems = await readNavigation(c.env, locale);
 
   return c.html(
     <Layout
       nonce={c.get('cspNonce')}
       lang={locale}
-      title={title}
-      description={String(post[locale === 'en' ? 'excerpt_en' : 'excerpt_uk'] ?? '')}
+      title={metaTitle}
+      description={description}
       canonical={locale === 'en' ? enHref : ukHref}
+      {...(image ? { image } : {})}
+      type="article"
       menuItems={menuItems}
       languageHref={locale === 'en' ? ukPath : hasEnglish ? enPath : '/en/'}
-      jsonLd={{
-        '@context': 'https://schema.org',
-        '@type': 'Article',
+      jsonLd={articleJsonLd({
+        base,
+        url: locale === 'en' ? enHref : ukHref,
         headline: title,
+        description,
+        locale,
         datePublished: String(post.published_at),
         dateModified: String(post.updated_at),
-        mainEntityOfPage: locale === 'en' ? enHref : ukHref,
-        inLanguage: locale,
-      }}
+        ...(image ? { image } : {}),
+        breadcrumbs: [
+          {
+            name: locale === 'en' ? 'Archive' : 'Архів',
+            url: `${base}${locale === 'en' ? '/en/' : '/'}`,
+          },
+          { name: title, url: locale === 'en' ? enHref : ukHref },
+        ],
+      })}
       alternates={
         locale === 'en' || hasEnglish
           ? [

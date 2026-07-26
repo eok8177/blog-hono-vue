@@ -155,6 +155,21 @@ describe('public routes', () => {
     expect(text).toContain('Fauna');
   });
 
+  it('renders canonical, hreflang and valid WebSite JSON-LD on the homepage', async () => {
+    const text = await (await SELF.fetch('https://example.test/')).text();
+    expect(text).toContain('<link rel="canonical" href="http://example.test/"');
+    expect(text).toContain('hreflang="uk" href="http://example.test/"');
+    expect(text).toContain('hreflang="en" href="http://example.test/en/"');
+
+    const jsonLd = text.match(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/)?.[1];
+    expect(jsonLd).toBeDefined();
+    const graph = JSON.parse(jsonLd!);
+    expect(graph['@context']).toBe('https://schema.org');
+    expect(graph['@graph']).toEqual(
+      expect.arrayContaining([expect.objectContaining({ '@type': 'WebSite' })]),
+    );
+  });
+
   it('search page renders', async () => {
     const text = await (await SELF.fetch('https://example.test/search')).text();
     expect(text).toContain('Пошук');

@@ -2,6 +2,7 @@ import type { Context, Hono } from 'hono';
 import { paginationSchema } from '@fauna/shared';
 import type { AppEnv } from '../../index';
 import { Layout } from '../../views/layout';
+import { collectionJsonLd, firstText, textSummary } from './seo';
 import { readNavigation, siteUrl } from './shared';
 
 type Locale = 'uk' | 'en';
@@ -41,6 +42,16 @@ async function renderCategory(c: Context<AppEnv>, locale: Locale) {
   const enHref = `${base}${enPath}`;
   const hasEnglish = Number(category.is_en_published) === 1;
   const title = String(category[locale === 'en' ? 'title_en' : 'title_uk']);
+  const metaTitle = firstText(category[locale === 'en' ? 'seo_title_en' : 'seo_title_uk'], title);
+  const description = textSummary(
+    category[locale === 'en' ? 'seo_description_en' : 'seo_description_uk'],
+    firstText(
+      category[locale === 'en' ? 'description_md_en' : 'description_md_uk'],
+      locale === 'en'
+        ? 'Observations gathered across the southern landscape.'
+        : 'Спостереження, зібрані в ландшафтах півдня України.',
+    ),
+  );
   const menuItems = await readNavigation(c.env, locale);
   const total = (queries[1]!.results[0] as { count: number }).count;
   const pages = Math.max(1, Math.ceil(total / pagination.pageSize));
@@ -54,12 +65,28 @@ async function renderCategory(c: Context<AppEnv>, locale: Locale) {
     <Layout
       nonce={c.get('cspNonce')}
       lang={locale}
-      title={title}
-      description={String(
-        category[locale === 'en' ? 'description_md_en' : 'description_md_uk'] ?? '',
-      )}
+      title={metaTitle}
+      description={description}
       canonical={canonical}
       menuItems={menuItems}
+      jsonLd={collectionJsonLd({
+        base,
+        url: canonical,
+        name: title,
+        description,
+        locale,
+        breadcrumbs: [
+          {
+            name: locale === 'en' ? 'Archive' : 'Архів',
+            url: `${base}${locale === 'en' ? '/en/' : '/'}`,
+          },
+          { name: title, url: canonical },
+        ],
+        items: posts.map((post) => ({
+          name: String(post.title),
+          url: `${base}${locale === 'en' ? '/en/post/' : '/post/'}${post.slug}`,
+        })),
+      })}
       languageHref={locale === 'en' ? ukPath : hasEnglish ? enPath : '/en/'}
       alternates={
         locale === 'en' || hasEnglish
@@ -86,14 +113,7 @@ async function renderCategory(c: Context<AppEnv>, locale: Locale) {
             <p class="eyebrow">{locale === 'en' ? 'Field notes' : 'Польові нотатки'}</p>
             <h1>{title}</h1>
           </div>
-          <p>
-            {String(
-              category[locale === 'en' ? 'description_md_en' : 'description_md_uk'] ??
-                (locale === 'en'
-                  ? 'Observations gathered across the southern landscape.'
-                  : 'Спостереження, зібрані в ландшафтах півдня України.'),
-            )}
-          </p>
+          <p>{description}</p>
         </header>
         {posts.length ? (
           <div class="post-list">

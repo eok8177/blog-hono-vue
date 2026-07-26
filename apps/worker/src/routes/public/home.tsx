@@ -2,7 +2,8 @@ import type { Context, Hono } from 'hono';
 import type { AppEnv } from '../../index';
 import { listPublished } from '../../services/posts';
 import { Layout, SectionLabel } from '../../views/layout';
-import { readNavigation, readSettings, settingText } from './shared';
+import { homeJsonLd } from './seo';
+import { readNavigation, readSettings, settingText, siteUrl } from './shared';
 
 type Locale = 'uk' | 'en';
 
@@ -33,7 +34,10 @@ async function renderHome(c: Context<AppEnv>, locale: Locale) {
       ? 'A living archive of observations, field notes and research from the southern Ukrainian landscape.'
       : 'Живий архів спостережень, польових нотаток і досліджень ландшафтів півдня України.',
   );
+  const base = siteUrl(c.env);
+  const path = locale === 'en' ? '/en/' : '/';
   const basePath = locale === 'en' ? '/en' : '';
+  const canonical = `${base}${path}`;
   const menuItems = await readNavigation(c.env, locale);
 
   return c.html(
@@ -42,6 +46,19 @@ async function renderHome(c: Context<AppEnv>, locale: Locale) {
       lang={locale}
       title={title}
       description={settingText(site[locale === 'en' ? 'descriptionEn' : 'descriptionUk'], intro)}
+      canonical={canonical}
+      alternates={[
+        { lang: 'uk', href: `${base}/` },
+        { lang: 'en', href: `${base}/en/` },
+        { lang: 'x-default', href: `${base}/` },
+      ]}
+      jsonLd={homeJsonLd({
+        base,
+        url: canonical,
+        name: title,
+        description: settingText(site[locale === 'en' ? 'descriptionEn' : 'descriptionUk'], intro),
+        locale,
+      })}
       menuItems={menuItems}
     >
       <section class="hero" aria-labelledby="home-title">

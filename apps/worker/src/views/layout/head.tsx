@@ -11,7 +11,17 @@ export const Head: FC<{
   robots?: string | undefined;
   image?: string | undefined;
   type?: 'website' | 'article';
-}> = ({ title, nonce, description, canonical, alternates, jsonLd, robots, image, type = 'website' }) => {
+}> = ({
+  title,
+  nonce,
+  description,
+  canonical,
+  alternates,
+  jsonLd,
+  robots,
+  image,
+  type = 'website',
+}) => {
   return (
     <head>
       <meta charSet="utf-8" />
@@ -22,17 +32,19 @@ export const Head: FC<{
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description ?? ''} />
       <meta property="og:type" content={type} />
+      {canonical ? <meta property="og:url" content={canonical} /> : null}
       {image ? <meta property="og:image" content={image} /> : null}
       {image ? <meta property="og:image:width" content="1200" /> : null}
       {image ? <meta property="og:image:height" content="630" /> : null}
       <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
       <meta name="twitter:title" content={title} />
       {description ? <meta name="twitter:description" content={description} /> : null}
+      {image ? <meta name="twitter:image" content={image} /> : null}
       <meta name="twitter:site" content="@fauna_archive" />
       {robots ? <meta name="robots" content={robots} /> : null}
       {canonical ? <link rel="canonical" href={canonical} /> : null}
       {alternates?.map((alternate) => (
-        <link rel="alternate" hrefLang={alternate.lang} href={alternate.href} />
+        <link rel="alternate" hreflang={alternate.lang} href={alternate.href} />
       ))}
       <title>{title}</title>
       {jsonLd ? (

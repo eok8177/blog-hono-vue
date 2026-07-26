@@ -2,6 +2,7 @@ import type { Context, Hono } from 'hono';
 import type { AppEnv } from '../../index';
 import { renderMarkdown } from '../../utils/content';
 import { Layout, Markdown } from '../../views/layout';
+import { firstText, pageJsonLd, textSummary } from './seo';
 import { findRedirect, readNavigation, siteUrl } from './shared';
 
 type Locale = 'uk' | 'en';
@@ -26,6 +27,11 @@ async function renderPage(c: Context<AppEnv>, locale: Locale) {
 
   const title = String(page[locale === 'en' ? 'title_en' : 'title_uk']);
   const body = String(page[locale === 'en' ? 'body_md_en' : 'body_md_uk']);
+  const metaTitle = firstText(page[locale === 'en' ? 'seo_title_en' : 'seo_title_uk'], title);
+  const description = textSummary(
+    page[locale === 'en' ? 'seo_description_en' : 'seo_description_uk'],
+    body,
+  );
   const base = siteUrl(c.env);
   const slug = c.req.param('slug') ?? '';
   const ukPath = `/${slug}`;
@@ -47,13 +53,32 @@ async function renderPage(c: Context<AppEnv>, locale: Locale) {
       caption: string | null;
     }>();
 
+  const canonical = locale === 'en' ? enHref : ukHref;
+  const image = gallery.results[0] ? `${base}/media/${gallery.results[0].id}/1600` : undefined;
+
   return c.html(
     <Layout
       nonce={c.get('cspNonce')}
       lang={locale}
-      title={title}
-      canonical={locale === 'en' ? enHref : ukHref}
+      title={metaTitle}
+      description={description}
+      canonical={canonical}
+      {...(image ? { image } : {})}
       menuItems={menuItems}
+      jsonLd={pageJsonLd({
+        base,
+        url: canonical,
+        name: title,
+        description,
+        locale,
+        breadcrumbs: [
+          {
+            name: locale === 'en' ? 'Archive' : 'Архів',
+            url: `${base}${locale === 'en' ? '/en/' : '/'}`,
+          },
+          { name: title, url: canonical },
+        ],
+      })}
       languageHref={locale === 'en' ? ukPath : hasEnglish ? enPath : '/en/'}
       alternates={
         locale === 'en' || hasEnglish
