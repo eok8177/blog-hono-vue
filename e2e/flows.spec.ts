@@ -70,8 +70,6 @@ test.describe('admin authentication flow', () => {
 
 test.describe('full content lifecycle', () => {
   const ukSlug = `e2e-test-${Date.now()}`;
-  const enSlug = ukSlug;
-
   test('1. Navigate public homepages', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Фауна/);
@@ -166,9 +164,9 @@ test.describe('full content lifecycle', () => {
 
     // Verify search API finds it
     const searchRes = await request.get(`/api/search?q=E2E+Test&locale=uk`);
+    // Search may or may not find it depending on FTS
     if (searchRes.ok()) {
-      const searchData = await searchRes.json();
-      // Search may or may not find it depending on FTS
+      await searchRes.json();
     }
   });
 

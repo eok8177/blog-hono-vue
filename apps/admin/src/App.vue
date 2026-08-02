@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
+import CatalogueIcon from './components/CatalogueIcon.vue';
 
 const route = useRoute();
 const sidebarOpen = ref(false);
@@ -15,75 +16,81 @@ function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark';
 }
 const localAccessBypass = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
-const navigation = [
-  { label: 'Огляд', to: '/', icon: '⌂' },
-  { label: 'Публікації', to: '/posts', icon: '▤' },
-  { label: 'Категорії', to: '/categories', icon: '◈' },
-  { label: 'Сторінки', to: '/pages', icon: '▧' },
-  { label: 'Медіатека', to: '/media', icon: '▦' },
+const collection = [
+  { label: 'Огляд', to: '/', icon: 'journal' as const },
+  { label: 'Публікації', to: '/posts', icon: 'card' as const },
+  { label: 'Категорії', to: '/categories', icon: 'collection' as const },
+  { label: 'Сторінки', to: '/pages', icon: 'journal' as const },
+  { label: 'Медіатека', to: '/media', icon: 'photo' as const },
 ];
-const administration = [
-  { label: 'Користувачі', to: '/users', icon: '◎' },
-  { label: 'Налаштування', to: '/settings', icon: '⚙' },
-  { label: 'Redirects', to: '/redirects', icon: '↪' },
-  { label: 'Журнал дій', to: '/audit-log', icon: '≡' },
+const system = [
+  { label: 'Користувачі', to: '/users', icon: 'card' as const },
+  { label: 'Налаштування', to: '/settings', icon: 'collection' as const },
+  { label: 'Redirects', to: '/redirects', icon: 'external' as const },
+  { label: 'Журнал дій', to: '/audit-log', icon: 'journal' as const },
 ];
-const currentSection = computed(() => {
-  const item = [...navigation, ...administration].find((entry) =>
-    entry.to === '/' ? route.path === '/' : route.path.startsWith(entry.to),
-  );
-  return item?.label ?? 'Адмінпанель';
-});
+const currentSection = computed(
+  () =>
+    [...collection, ...system].find((entry) =>
+      entry.to === '/' ? route.path === '/' : route.path.startsWith(entry.to),
+    )?.label ?? 'Адмінпанель',
+);
 function isActive(path: string) {
   return path === '/' ? route.path === '/' : route.path.startsWith(path);
 }
 function closeSidebar() {
   sidebarOpen.value = false;
 }
+function onDocumentKeydown(event: Event) {
+  if ((event as { key?: string }).key === 'Escape' && sidebarOpen.value) closeSidebar();
+}
+
+onMounted(() => document.addEventListener('keydown', onDocumentKeydown));
+onBeforeUnmount(() => document.removeEventListener('keydown', onDocumentKeydown));
 </script>
 <template>
   <div class="admin-shell">
     <div v-if="sidebarOpen" class="admin-sidebar-backdrop" @click="closeSidebar" />
     <aside class="admin-sidebar" :class="{ 'admin-sidebar-open': sidebarOpen }">
       <div class="admin-brand">
-        <span class="admin-brand-mark">F</span>
-        <span><strong>Fauna</strong><small>Archive Admin</small></span>
+        <span class="admin-brand-mark" aria-hidden="true">F</span>
+        <span><strong>Fauna</strong><small>Польовий каталог</small></span>
         <button
           class="admin-sidebar-close"
           type="button"
           aria-label="Закрити меню"
           @click="closeSidebar"
         >
-          ×
+          <CatalogueIcon name="close" />
         </button>
       </div>
       <nav aria-label="Адміністративна навігація">
-        <p class="admin-nav-label">Меню</p>
+        <p class="admin-nav-label">Колекція</p>
         <RouterLink
-          v-for="item in navigation"
+          v-for="item in collection"
           :key="item.to"
           :to="item.to"
           class="admin-nav-link"
           :class="{ 'admin-nav-link-active': isActive(item.to) }"
           @click="closeSidebar"
-          ><span class="admin-nav-icon">{{ item.icon }}</span
-          >{{ item.label }}</RouterLink
         >
-        <p class="admin-nav-label admin-nav-label-spaced">Адміністрування</p>
+          <CatalogueIcon :name="item.icon" />{{ item.label }}
+        </RouterLink>
+        <p class="admin-nav-label admin-nav-label-spaced">Система</p>
         <RouterLink
-          v-for="item in administration"
+          v-for="item in system"
           :key="item.to"
           :to="item.to"
           class="admin-nav-link"
           :class="{ 'admin-nav-link-active': isActive(item.to) }"
           @click="closeSidebar"
-          ><span class="admin-nav-icon">{{ item.icon }}</span
-          >{{ item.label }}</RouterLink
         >
+          <CatalogueIcon :name="item.icon" />{{ item.label }}
+        </RouterLink>
       </nav>
       <div class="admin-sidebar-footer">
-        <span class="admin-avatar">A</span>
-        <span><strong>Адміністратор</strong><small>Content manager</small></span>
+        <span class="admin-avatar">A</span
+        ><span><strong>Адміністратор</strong><small>Content manager</small></span>
       </div>
     </aside>
     <div class="admin-main">
@@ -95,14 +102,14 @@ function closeSidebar() {
             aria-label="Відкрити меню"
             @click="sidebarOpen = true"
           >
-            ☰
+            <CatalogueIcon name="menu" />
           </button>
           <div class="admin-breadcrumb">
-            <span>Адмінпанель</span><b>/</b><strong>{{ currentSection }}</strong>
+            <span>Каталог</span><b>/</b><strong>{{ currentSection }}</strong>
           </div>
         </div>
         <div class="admin-topbar-right">
-          <span class="admin-status-dot">●</span
+          <span class="admin-status-dot" aria-hidden="true"></span
           ><span class="admin-status-text">Система працює</span>
           <span v-if="localAccessBypass" class="admin-env-badge">Local</span>
           <button
@@ -112,7 +119,7 @@ function closeSidebar() {
             :title="theme === 'dark' ? 'Світла тема' : 'Темна тема'"
             @click="toggleTheme"
           >
-            {{ theme === 'dark' ? '☀' : '☾' }}
+            {{ theme === 'dark' ? 'Light' : 'Dark' }}
           </button>
           <a v-if="!localAccessBypass" class="admin-logout" href="/cdn-cgi/access/logout">Вийти</a>
         </div>

@@ -4,22 +4,57 @@ import type { Bindings, Actor } from '../env';
 import { isSlugUniqueConstraint, resolveSlug, SlugTakenError } from '../utils/slug';
 
 type Pagination = { page: number; pageSize: number };
+export type PostListOptions = Pagination & {
+  search?: string;
+  status?: 'draft' | 'published' | 'archived' | undefined;
+  category?: string | undefined;
+  translation?: 'ready' | 'missing' | undefined;
+  seo?: 'missing' | undefined;
+  sort?: 'updated' | 'title' | undefined;
+};
 
-export async function listAdminPosts(env: Bindings, pagination: Pagination, search: string) {
-  const where = search ? 'WHERE title_uk LIKE ? OR title_en LIKE ?' : '';
-  const args = search ? [`%${search}%`, `%${search}%`] : [];
+export async function listAdminPosts(env: Bindings, options: PostListOptions) {
+  const conditions: string[] = [];
+  const args: (string | number)[] = [];
+  const search = options.search?.trim();
+  if (search) {
+    conditions.push('(p.title_uk LIKE ? OR p.title_en LIKE ? OR p.slug LIKE ?)');
+    args.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (options.status) {
+    conditions.push('p.status = ?');
+    args.push(options.status);
+  }
+  if (options.category) {
+    conditions.push(
+      'EXISTS (SELECT 1 FROM post_categories pc_filter WHERE pc_filter.post_id=p.id AND pc_filter.category_id=?)',
+    );
+    args.push(options.category);
+  }
+  if (options.translation === 'ready') conditions.push('p.is_en_published = 1');
+  if (options.translation === 'missing')
+    conditions.push('(p.is_en_published = 0 OR p.is_en_published IS NULL)');
+  if (options.seo === 'missing')
+    conditions.push("(p.seo_description_uk IS NULL OR trim(p.seo_description_uk) = '')");
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const order =
+    options.sort === 'title'
+      ? 'p.title_uk COLLATE NOCASE ASC, p.updated_at DESC'
+      : 'p.updated_at DESC';
+  const offset = (options.page - 1) * options.pageSize;
+  const select = `SELECT p.id,p.slug,p.title_uk,p.title_en,p.status,p.is_en_published,p.updated_at,
+    (SELECT c.title_uk FROM categories c JOIN post_categories pc ON pc.category_id=c.id WHERE pc.post_id=p.id ORDER BY c.title_uk LIMIT 1) category_title,
+    (SELECT count(*) FROM post_categories pc_count WHERE pc_count.post_id=p.id) category_count
+    FROM posts p ${where} ORDER BY ${order} LIMIT ? OFFSET ?`;
   const results = await env.DB.batch([
-    env.DB.prepare(
-      `SELECT id,slug,title_uk,title_en,status,is_en_published,updated_at FROM posts ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
-    ).bind(...args, pagination.pageSize, (pagination.page - 1) * pagination.pageSize),
-    env.DB.prepare(`SELECT count(*) count FROM posts ${where}`).bind(...args),
+    env.DB.prepare(select).bind(...args, options.pageSize, offset),
+    env.DB.prepare(`SELECT count(*) count FROM posts p ${where}`).bind(...args),
   ]);
-
   return {
     items: results[0]!.results,
     total: Number((results[1]!.results[0] as { count: number }).count),
-    page: pagination.page,
-    pageSize: pagination.pageSize,
+    page: options.page,
+    pageSize: options.pageSize,
   };
 }
 

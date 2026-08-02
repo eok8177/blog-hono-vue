@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { useRoute } from 'vue-router';
 import { api, ApiError } from '../api/client';
 import { uploadMedia, cancelUpload, onUploadProgress, type UploadProgress } from '../api/media';
 import AdminPagination from '../components/AdminPagination.vue';
+import CatalogueIcon from '../components/CatalogueIcon.vue';
 
 type Media = {
   id: string;
@@ -21,12 +23,15 @@ type Media = {
   updated_at: string;
 };
 
+const route = useRoute();
 const file = ref<File>();
 const altUk = ref('');
 const uploadFolder = ref('');
 const message = ref('');
 const selectedId = ref<string>();
 const folderFilter = ref('');
+const mediaSearch = ref('');
+const altFilter = ref(route.query.alt === 'missing' ? 'missing' : '');
 const newFolderName = ref('');
 const showNewFolderInput = ref(false);
 const selectedIds = ref<Set<string>>(new Set());
@@ -42,13 +47,26 @@ const folders = useQuery({
 const mediaPage = ref(1);
 const mediaPageSize = 20;
 const media = useQuery({
-  queryKey: computed(() => ['media', { folder: folderFilter.value, page: mediaPage.value }]),
+  queryKey: computed(() => [
+    'media',
+    {
+      q: mediaSearch.value,
+      folder: folderFilter.value,
+      alt: altFilter.value,
+      page: mediaPage.value,
+    },
+  ]),
   queryFn: () => {
-    const params = new URLSearchParams();
-    if (folderFilter.value) params.set('folder', folderFilter.value);
-    params.set('page', String(mediaPage.value));
-    params.set('pageSize', String(mediaPageSize));
-    const qs = params.toString();
+    const params: Record<string, string> = {
+      page: String(mediaPage.value),
+      pageSize: String(mediaPageSize),
+    };
+    if (mediaSearch.value) params.q = mediaSearch.value;
+    if (folderFilter.value) params.folder = folderFilter.value;
+    if (altFilter.value) params.alt = altFilter.value;
+    const qs = Object.entries(params)
+      .map(([key, value]) => `${key}=${window.encodeURIComponent(value)}`)
+      .join('&');
     return api<{ items: Media[]; total: number }>(`/media${qs ? `?${qs}` : ''}`);
   },
 });
@@ -95,14 +113,16 @@ const upload = useMutation({
     file.value = undefined;
     altUk.value = '';
     keepOriginal.value = false;
-    setTimeout(() => { uploadProgress.value = null; }, 3000);
+    window.setTimeout(() => {
+      uploadProgress.value = null;
+    }, 3000);
     await Promise.all([
       client.invalidateQueries({ queryKey: ['media'] }),
       client.invalidateQueries({ queryKey: ['media-folders'] }),
     ]);
   },
   onError: (e) => {
-    if (e instanceof DOMException && e.name === 'AbortError') {
+    if (e instanceof window.DOMException && e.name === 'AbortError') {
       // Cancelled by user – keep UI clean
     } else {
       message.value = e instanceof Error ? e.message : 'Upload не вдався.';
@@ -176,6 +196,14 @@ function toggleSelect(id: string) {
   selectedIds.value = next;
 }
 
+function selectCardFromKeyboard(event: Event, id: string) {
+  if (event.target !== event.currentTarget) return;
+  const key = (event as { key?: string }).key;
+  if (key !== 'Enter' && key !== ' ') return;
+  event.preventDefault();
+  toggleSelect(id);
+}
+
 function selectAll() {
   if (selectedIds.value.size === items.value.length) {
     selectedIds.value = new Set();
@@ -214,7 +242,7 @@ async function createFolder() {
   showNewFolderInput.value = false;
 }
 
-watch(folderFilter, () => {
+watch([folderFilter, mediaSearch, altFilter], () => {
   selectedIds.value = new Set();
   mediaPage.value = 1;
 });
@@ -232,6 +260,18 @@ watch(folderFilter, () => {
 
     <!-- Folder toolbar -->
     <div class="admin-folder-toolbar">
+      <label class="admin-search"
+        ><span class="sr-only">Пошук медіа</span><CatalogueIcon name="search" /><input
+          v-model="mediaSearch"
+          type="search"
+          placeholder="Alt або підпис"
+      /></label>
+      <label class="admin-filter media-alt-filter"
+        >Alt<select v-model="altFilter">
+          <option value="">Усі описи</option>
+          <option value="missing">Без українського alt</option>
+        </select></label
+      >
       <div class="admin-folder-tabs">
         <button
           type="button"
@@ -257,14 +297,10 @@ watch(folderFilter, () => {
         class="admin-secondary-button"
         @click="showNewFolderInput = !showNewFolderInput"
       >
-        + Папка
+        <CatalogueIcon name="folder" /> Папка
       </button>
     </div>
-    <form
-      v-if="showNewFolderInput"
-      class="admin-inline-form"
-      @submit.prevent="createFolder"
-    >
+    <form v-if="showNewFolderInput" class="admin-inline-form" @submit.prevent="createFolder">
       <label class="admin-inline-label">
         Назва папки
         <input v-model="newFolderName" placeholder="Нова папка" maxlength="200" />
@@ -285,18 +321,14 @@ watch(folderFilter, () => {
       <button :disabled="batchMove.isPending.value" @click="batchMove.mutate()">
         {{ batchMove.isPending.value ? 'Переміщення…' : 'Перемістити' }}
       </button>
-      <button
-        type="button"
-        class="admin-secondary-button"
-        @click="selectedIds = new Set()"
-      >
+      <button type="button" class="admin-secondary-button" @click="selectedIds = new Set()">
         Скасувати
       </button>
     </div>
 
     <!-- Upload form -->
     <form class="admin-upload-card" @submit.prevent="upload.mutate()">
-      <div class="admin-upload-icon">📁</div>
+      <div class="admin-upload-icon" aria-hidden="true"><CatalogueIcon name="photo" /></div>
       <div>
         <h2>Додати зображення</h2>
         <p>JPEG, PNG або WebP. Варіанти створюються автоматично.</p>
@@ -368,7 +400,9 @@ watch(folderFilter, () => {
         </button>
 
         <button
-          v-else-if="uploadProgress?.stage !== 'converting' && uploadProgress?.stage !== 'uploading'"
+          v-else-if="
+            uploadProgress?.stage !== 'converting' && uploadProgress?.stage !== 'uploading'
+          "
           :disabled="upload.isPending.value"
         >
           {{ upload.isPending.value ? 'Конвертація…' : 'Завантажити' }}
@@ -385,7 +419,14 @@ watch(folderFilter, () => {
           <p class="admin-eyebrow">Metadata</p>
           <h2>Редагування зображення</h2>
         </div>
-        <button type="button" class="admin-close-button" @click="selectedId = undefined">×</button>
+        <button
+          type="button"
+          class="admin-close-button"
+          aria-label="Закрити редактор метаданих"
+          @click="selectedId = undefined"
+        >
+          <CatalogueIcon name="close" />
+        </button>
       </div>
       <div class="admin-form-grid">
         <label>Alt українською <input v-model="form.altUk" required /></label
@@ -438,7 +479,10 @@ watch(folderFilter, () => {
         :key="item.id"
         class="admin-media-card"
         :class="{ 'admin-media-card-selected': selectedIds.has(item.id) }"
-        @click="toggleSelect(item.id)"
+        role="group"
+        tabindex="0"
+        :aria-label="`Медіафайл ${item.alt_uk || item.id.slice(0, 8)}`"
+        @keydown="selectCardFromKeyboard($event, item.id)"
       >
         <div class="admin-media-preview">
           <img
@@ -451,10 +495,32 @@ watch(folderFilter, () => {
           <span v-if="item.folder" class="admin-folder-badge">{{ item.folder }}</span>
         </div>
         <div class="admin-media-info">
-          <strong>{{ item.alt_uk }}</strong
-          ><span>{{ item.width }}×{{ item.height }} · {{ item.status }}</span>
+          <label class="media-select"
+            ><input
+              type="checkbox"
+              :checked="selectedIds.has(item.id)"
+              :aria-label="`Вибрати ${item.alt_uk || 'медіафайл'}`"
+              @click.stop
+              @keydown.stop
+              @change="toggleSelect(item.id)"
+            />
+            Вибрати</label
+          >
+          <strong>{{ item.alt_uk || 'Без українського alt' }}</strong>
+          <div class="media-alt-status">
+            <span :class="item.alt_uk.trim() ? 'media-alt-ready' : 'media-alt-missing'"
+              >UK: {{ item.alt_uk.trim() ? 'alt є' : 'alt порожній' }}</span
+            ><span :class="item.alt_en?.trim() ? 'media-alt-ready' : 'media-alt-missing'"
+              >EN: {{ item.alt_en?.trim() ? 'alt є' : 'alt порожній' }}</span
+            >
+          </div>
+          <span
+            >#{{ item.id.slice(0, 8) }} · {{ item.width }}×{{ item.height }} · {{ item.status }} ·
+            {{ new Date(item.updated_at).toLocaleDateString('uk-UA')
+            }}<template v-if="item.folder"> · {{ item.folder }}</template></span
+          >
         </div>
-        <div class="admin-media-actions" @click.stop>
+        <div class="admin-media-actions" @click.stop @keydown.stop>
           <button type="button" class="admin-secondary-button" @click="edit(item)">
             Редагувати</button
           ><button type="button" class="admin-danger-button" @click="remove(item)">Видалити</button>

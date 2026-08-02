@@ -30,14 +30,11 @@ const folders = computed(() => {
   return [...set].sort();
 });
 
-const hasUnfoldered = computed(() =>
-  availableMedia.value.some((m) => !m.folder),
-);
+const hasUnfoldered = computed(() => availableMedia.value.some((m) => !m.folder));
 
 const filteredMedia = computed(() => {
   if (!folderFilter.value) return availableMedia.value;
-  if (folderFilter.value === '__nofolder__')
-    return availableMedia.value.filter((m) => !m.folder);
+  if (folderFilter.value === '__nofolder__') return availableMedia.value.filter((m) => !m.folder);
   return availableMedia.value.filter((m) => m.folder === folderFilter.value);
 });
 
@@ -100,11 +97,7 @@ onMounted(async () => {
         </button>
       </div>
       <div class="admin-gallery-grid">
-        <label
-          v-for="item in filteredMedia"
-          :key="item.id"
-          class="admin-gallery-item"
-        >
+        <label v-for="item in filteredMedia" :key="item.id" class="admin-gallery-item">
           <input
             type="checkbox"
             :checked="modelValue.includes(item.id)"
@@ -120,11 +113,7 @@ onMounted(async () => {
             class="admin-gallery-thumb"
           />
           <span class="admin-gallery-name">{{ item.alt_uk }}</span>
-          <MediaCopyButton
-            :image="toMediaImage(item)"
-            class="admin-gallery-copy"
-            @click.stop
-          />
+          <MediaCopyButton :image="toMediaImage(item)" class="admin-gallery-copy" @click.stop />
         </label>
       </div>
     </template>

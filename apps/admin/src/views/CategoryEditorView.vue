@@ -111,7 +111,11 @@ async function save() {
     <p v-if="loading" class="admin-state">Завантаження…</p>
     <form v-else class="admin-editor-form" @submit.prevent="save">
       <p v-if="error" role="alert">{{ error }}</p>
-      <label>Slug <input v-model="form.slug" pattern="[a-z0-9-]+" /><small v-if="!form.slug.trim()">Згенерується з назви автоматично</small></label>
+      <label
+        >Slug <input v-model="form.slug" pattern="[a-z0-9-]+" /><small v-if="!form.slug.trim()"
+          >Згенерується з назви автоматично</small
+        ></label
+      >
       <div class="admin-form-grid">
         <label>Назва українською <input v-model="form.titleUk" required /></label>
         <label>Title English <input v-model="form.titleEn" /></label>
@@ -119,10 +123,14 @@ async function save() {
       <label>Опис українською <textarea v-model="form.descriptionMdUk" rows="5" /></label>
       <label>Description English <textarea v-model="form.descriptionMdEn" rows="5" /></label>
       <div class="admin-form-actions">
-        <label class="admin-checkbox"><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label>
-        <label class="admin-checkbox"><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label>
+        <label class="admin-checkbox"
+          ><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label
+        >
+        <label class="admin-checkbox"
+          ><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label
+        >
         <label>
-            Порядок у меню <input v-model.number="form.menuOrder" type="number" min="0"/>
+          Порядок у меню <input v-model.number="form.menuOrder" type="number" min="0" />
         </label>
         <label
           >Статус

@@ -78,9 +78,9 @@ describe('shouldAutoGenerateSlug', () => {
     });
 
     it('returns false when a non-empty slug is provided', () => {
-      expect(
-        shouldAutoGenerateSlug({ slug: 'my-custom-slug', titleUk: 'Test' }, false),
-      ).toBe(false);
+      expect(shouldAutoGenerateSlug({ slug: 'my-custom-slug', titleUk: 'Test' }, false)).toBe(
+        false,
+      );
     });
 
     it('returns false for null / non-object body', () => {
@@ -126,7 +126,9 @@ describe('isSlugUniqueConstraint', () => {
   it('does not treat another unique constraint as a slug collision', () => {
     expect(
       isSlugUniqueConstraint(
-        new Error('D1_ERROR: UNIQUE constraint failed: post_categories.post_id, post_categories.category_id'),
+        new Error(
+          'D1_ERROR: UNIQUE constraint failed: post_categories.post_id, post_categories.category_id',
+        ),
         'posts',
       ),
     ).toBe(false);

@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import { z } from 'zod';
 import { apiError, apiSuccess, paginationSchema } from '@fauna/shared';
 import type { AppEnv } from '../../index';
 import {
@@ -31,6 +32,21 @@ import { requireActor, requireAdmin } from '../../middleware/auth';
 import { renderMarkdown } from '../../utils/content';
 import { Layout, Markdown } from '../../views/layout';
 
+const listFilterSchema = z.object({
+  q: z.string().max(100).optional().default(''),
+  status: z.enum(['draft', 'published', 'archived']).optional(),
+  category: z.string().uuid().optional(),
+  translation: z.enum(['ready', 'missing']).optional(),
+  seo: z.literal('missing').optional(),
+  sort: z.enum(['updated', 'title']).optional().default('updated'),
+});
+const pageFilterSchema = z.object({
+  q: z.string().max(100).optional().default(''),
+  status: z.enum(['draft', 'published', 'archived']).optional(),
+  translation: z.enum(['ready', 'missing']).optional(),
+  sort: z.enum(['updated', 'title']).optional().default('updated'),
+});
+
 const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.header('Cache-Control', 'no-store');
   await next();
@@ -39,12 +55,28 @@ const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
 export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   app.use('/api/admin/*', noStore, requireActor);
   app.get('/api/admin/session', (c) => c.json(apiSuccess(c.get('actor'))));
-  app.get('/api/admin/dashboard', async (c) => c.json(apiSuccess(await getDashboardStats(c.env))));
+  app.get('/api/admin/dashboard', async (c) =>
+    c.json(apiSuccess(await getDashboardStats(c.env, c.get('actor')))),
+  );
 
   app.get('/api/admin/posts', async (c) => {
-    const pagination = paginationSchema.parse(c.req.query());
-    const search = (c.req.query('q') ?? '').slice(0, 100);
-    return c.json(apiSuccess(await listAdminPosts(c.env, pagination, search)));
+    const paginationResult = paginationSchema.safeParse(c.req.query());
+    const filtersResult = listFilterSchema.safeParse(c.req.query());
+    if (!paginationResult.success || !filtersResult.success)
+      return c.json(apiError('VALIDATION_ERROR', 'Некоректні параметри списку'), 400);
+    return c.json(
+      apiSuccess(
+        await listAdminPosts(c.env, {
+          ...paginationResult.data,
+          search: filtersResult.data.q,
+          status: filtersResult.data.status,
+          category: filtersResult.data.category,
+          translation: filtersResult.data.translation,
+          seo: filtersResult.data.seo,
+          sort: filtersResult.data.sort,
+        }),
+      ),
+    );
   });
   app.get('/api/admin/posts/:id/preview', async (c) => {
     const post = await findAdminPost(c.env, c.req.param('id'));
@@ -154,9 +186,21 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
   });
 
   app.get('/api/admin/pages', async (c) => {
-    const pagination = paginationSchema.parse(c.req.query());
-    const search = (c.req.query('q') ?? '').slice(0, 100);
-    return c.json(apiSuccess(await listAdminPages(c.env, pagination, search)));
+    const paginationResult = paginationSchema.safeParse(c.req.query());
+    const filtersResult = pageFilterSchema.safeParse(c.req.query());
+    if (!paginationResult.success || !filtersResult.success)
+      return c.json(apiError('VALIDATION_ERROR', 'Некоректні параметри списку'), 400);
+    return c.json(
+      apiSuccess(
+        await listAdminPages(c.env, {
+          ...paginationResult.data,
+          search: filtersResult.data.q,
+          status: filtersResult.data.status,
+          translation: filtersResult.data.translation,
+          sort: filtersResult.data.sort,
+        }),
+      ),
+    );
   });
   app.delete('/api/admin/pages/:id', async (c) => {
     if (c.get('actor').role !== 'admin')
@@ -255,7 +299,10 @@ export function registerAdminRoutes(app: import('hono').Hono<AppEnv>) {
     if (result.kind === 'self_delete')
       return c.json(apiError('SELF_DELETE', 'Не можна видалити самого себе'), 422);
     if (result.kind === 'last_admin')
-      return c.json(apiError('LAST_ADMIN', 'Не можна видалити останнього активного адміністратора'), 422);
+      return c.json(
+        apiError('LAST_ADMIN', 'Не можна видалити останнього активного адміністратора'),
+        422,
+      );
     return c.json(apiSuccess({ id: result.id, status: 'deleted' }));
   });
 

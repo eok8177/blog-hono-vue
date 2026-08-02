@@ -42,10 +42,7 @@ export async function listUsers(env: Pick<Bindings, 'DB'>, page: number, pageSiz
   };
 }
 
-export async function getUser(
-  env: Pick<Bindings, 'DB'>,
-  id: string,
-) {
+export async function getUser(env: Pick<Bindings, 'DB'>, id: string) {
   const row = await env.DB.prepare(
     'SELECT id, email, name, role, is_active, last_seen_at, created_at, updated_at FROM users WHERE id=?',
   )
@@ -69,7 +66,9 @@ export async function createUser(
   body: unknown,
 ): Promise<MutationResult> {
   const data = userInputSchema.parse(body);
-  const existing = await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(data.email).first();
+  const existing = await env.DB.prepare('SELECT id FROM users WHERE email=?')
+    .bind(data.email)
+    .first();
   if (existing) return { kind: 'email_taken' };
   const id = crypto.randomUUID();
   const timestamp = new Date().toISOString();
@@ -104,7 +103,9 @@ export async function updateUser(
     .first<{ role: 'admin' | 'editor'; is_active: number; email: string }>();
   if (!target) return { kind: 'missing' };
   if (target.email !== data.email) {
-    const collision = await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(data.email).first();
+    const collision = await env.DB.prepare('SELECT id FROM users WHERE email=?')
+      .bind(data.email)
+      .first();
     if (collision) return { kind: 'email_taken' };
   }
 
@@ -169,15 +170,7 @@ export async function deleteUser(
     env.DB.prepare('DELETE FROM users WHERE id=?').bind(userId),
     env.DB.prepare(
       'INSERT INTO audit_logs(id,actor_user_id,action,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)',
-    ).bind(
-      crypto.randomUUID(),
-      actor.id,
-      'user.delete',
-      'user',
-      userId,
-      '{}',
-      timestamp,
-    ),
+    ).bind(crypto.randomUUID(), actor.id, 'user.delete', 'user', userId, '{}', timestamp),
   ]);
   return { kind: 'ok', id: userId };
 }

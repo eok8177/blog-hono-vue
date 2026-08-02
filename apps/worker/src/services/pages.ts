@@ -10,31 +10,60 @@ import {
 } from '../utils/slug';
 
 type Pagination = { page: number; pageSize: number };
+export type PageListOptions = Pagination & {
+  search?: string;
+  status?: 'draft' | 'published' | 'archived' | undefined;
+  translation?: 'ready' | 'missing' | undefined;
+  sort?: 'updated' | 'title' | undefined;
+};
 
-export async function listAdminPages(env: Bindings, pagination: Pagination, search: string) {
-  const where = search ? 'WHERE title_uk LIKE ? OR title_en LIKE ?' : '';
-  const args = search ? [`%${search}%`, `%${search}%`] : [];
+export async function listAdminPages(env: Bindings, options: PageListOptions) {
+  const conditions: string[] = [];
+  const args: (string | number)[] = [];
+  const search = options.search?.trim();
+  if (search) {
+    conditions.push('(title_uk LIKE ? OR title_en LIKE ? OR slug LIKE ?)');
+    args.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (options.status) {
+    conditions.push('status = ?');
+    args.push(options.status);
+  }
+  if (options.translation === 'ready') conditions.push('is_en_published = 1');
+  if (options.translation === 'missing')
+    conditions.push('(is_en_published = 0 OR is_en_published IS NULL)');
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const order =
+    options.sort === 'title' ? 'title_uk COLLATE NOCASE ASC, updated_at DESC' : 'updated_at DESC';
   const results = await env.DB.batch([
-    env.DB.prepare(`SELECT * FROM pages ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`).bind(
-      ...args,
-      pagination.pageSize,
-      (pagination.page - 1) * pagination.pageSize,
-    ),
+    env.DB.prepare(
+      `SELECT id,slug,template,title_uk,title_en,status,is_en_published,updated_at FROM pages ${where} ORDER BY ${order} LIMIT ? OFFSET ?`,
+    ).bind(...args, options.pageSize, (options.page - 1) * options.pageSize),
     env.DB.prepare(`SELECT count(*) count FROM pages ${where}`).bind(...args),
   ]);
-
   return {
     items: results[0]!.results,
     total: Number((results[1]!.results[0] as { count: number }).count),
-    page: pagination.page,
-    pageSize: pagination.pageSize,
+    page: options.page,
+    pageSize: options.pageSize,
   };
 }
 
-export async function findAdminPage(env: Bindings, id: string) {
-  const page = await env.DB.prepare('SELECT * FROM pages WHERE id=?').bind(id).first<Record<string, unknown>>();
+type AdminPage = Record<string, unknown> & {
+  title_en: string | null;
+  body_md_en: string | null;
+  title_uk: string;
+  body_md_uk: string;
+};
+export async function findAdminPage(
+  env: Bindings,
+  id: string,
+): Promise<(AdminPage & { mediaIds: string[] }) | null> {
+  const page = await env.DB.prepare('SELECT * FROM pages WHERE id=?').bind(id).first<AdminPage>();
   if (!page) return null;
-  const media = await env.DB.prepare('SELECT media_id FROM page_media WHERE page_id=? ORDER BY position')
+  const media = await env.DB.prepare(
+    'SELECT media_id FROM page_media WHERE page_id=? ORDER BY position',
+  )
     .bind(id)
     .all<{ media_id: string }>();
   return { ...page, mediaIds: media.results.map((r) => r.media_id) };

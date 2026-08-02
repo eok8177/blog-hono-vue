@@ -63,10 +63,13 @@ describe('slugSchema – reserved slugs', () => {
     expect(slugSchema.safeParse(slug).success).toBe(false);
   });
 
-  it.each(reserved.filter((s) => !s.includes('.')))('rejects "%s" with a trailing variant', (slug) => {
-    // Slugs with dots (robots.txt, sitemap.xml) already fail the regex
-    expect(slugSchema.safeParse(`${slug}-alt`).success).toBe(true);
-  });
+  it.each(reserved.filter((s) => !s.includes('.')))(
+    'rejects "%s" with a trailing variant',
+    (slug) => {
+      // Slugs with dots (robots.txt, sitemap.xml) already fail the regex
+      expect(slugSchema.safeParse(`${slug}-alt`).success).toBe(true);
+    },
+  );
 
   it('rejects empty slug', () => {
     expect(slugSchema.safeParse('').success).toBe(false);
@@ -264,7 +267,7 @@ describe('postInputSchema', () => {
   });
 
   it('accepts post without slug (auto-generate)', () => {
-    const { slug, ...withoutSlug } = validPost();
+    const withoutSlug = { ...validPost(), slug: undefined };
     const result = postInputSchema.safeParse(withoutSlug);
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.slug).toBeUndefined();

@@ -85,7 +85,7 @@ function statusLabel(status: string) {
             </td>
             <td>
               <span class="admin-status-badge" :class="`admin-status-${item.status}`">
-                  {{ statusLabel(item.status) }}
+                {{ statusLabel(item.status) }}
               </span>
             </td>
             <td>{{ new Date(item.updated_at).toLocaleDateString('uk-UA') }}</td>
@@ -100,11 +100,7 @@ function statusLabel(status: string) {
           </tr>
         </tbody>
       </table>
-      <AdminPagination
-        :page="page"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-      />
+      <AdminPagination :page="page" :total-pages="totalPages" @update:page="page = $event" />
     </div>
   </section>
 </template>

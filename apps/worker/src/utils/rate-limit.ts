@@ -29,10 +29,7 @@ export interface RateLimitOpts {
  * Returns a response with 429 + Retry-After when the limit is exceeded.
  * Returns `null` when the request is allowed.
  */
-export async function rateLimit(
-  c: Context<AppEnv>,
-  opts: RateLimitOpts,
-): Promise<Response | null> {
+export async function rateLimit(c: Context<AppEnv>, opts: RateLimitOpts): Promise<Response | null> {
   const clientKey = opts.clientKey ?? clientIdentifier(c);
   const now = Date.now();
   const windowStart = new Date(now - opts.windowSeconds * 1000).toISOString();
@@ -49,10 +46,7 @@ export async function rateLimit(
 
   if (count >= opts.limit) {
     return c.json(
-      apiError(
-        'RATE_LIMITED',
-        `Забагато запитів. Спробуйте через ${opts.windowSeconds} секунд.`,
-      ),
+      apiError('RATE_LIMITED', `Забагато запитів. Спробуйте через ${opts.windowSeconds} секунд.`),
       429,
     );
   }
@@ -61,12 +55,7 @@ export async function rateLimit(
   await c.env.DB.prepare(
     'INSERT INTO rate_limit_entries (namespace, client_key, created_at, request_id) VALUES (?, ?, ?, ?)',
   )
-    .bind(
-      opts.namespace,
-      clientKey,
-      new Date(now).toISOString(),
-      c.get('requestId'),
-    )
+    .bind(opts.namespace, clientKey, new Date(now).toISOString(), c.get('requestId'))
     .run();
 
   // Periodic cleanup: purge entries older than 2 windows every 50th write

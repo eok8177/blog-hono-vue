@@ -40,9 +40,7 @@ function extractNameFromUrl(url: string): string {
 }
 
 function escapeMarkdownTitle(value: string): string {
-  return value
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', '\\"');
+  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 }
 
 export function isValidMediaUrl(url: string): boolean {
@@ -54,8 +52,11 @@ export function isValidMediaUrl(url: string): boolean {
     return false;
   }
 
-  if (/[\u0000-\u001F\u007F]/.test(url)) {
-    return false;
+  for (const character of url) {
+    const code = character.codePointAt(0) ?? 0;
+    if (code <= 0x1f || code === 0x7f) {
+      return false;
+    }
   }
 
   return true;

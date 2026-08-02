@@ -104,7 +104,11 @@ describe('category slug auto-generation', () => {
 
   it('returns slug_taken when explicit slug collides on create', async () => {
     await createCategory(env, { slug: 'unique-one', titleUk: 'One', status: 'draft' });
-    const result = await createCategory(env, { slug: 'unique-one', titleUk: 'Two', status: 'draft' });
+    const result = await createCategory(env, {
+      slug: 'unique-one',
+      titleUk: 'Two',
+      status: 'draft',
+    });
     expect(result.kind).toBe('slug_taken');
   });
 
@@ -156,8 +160,16 @@ describe('category slug auto-generation', () => {
   it('returns slug_taken when explicit slug collides on update (different entity)', async () => {
     // Use explicit slugs to avoid residue from previous tests.
     const suffix = Date.now();
-    const first = await createCategory(env, { slug: `first-${suffix}`, titleUk: 'Перша', status: 'draft' });
-    const second = await createCategory(env, { slug: `second-${suffix}`, titleUk: 'Друга', status: 'draft' });
+    const first = await createCategory(env, {
+      slug: `first-${suffix}`,
+      titleUk: 'Перша',
+      status: 'draft',
+    });
+    const second = await createCategory(env, {
+      slug: `second-${suffix}`,
+      titleUk: 'Друга',
+      status: 'draft',
+    });
     expect(first.kind).toBe('ok');
     expect(second.kind).toBe('ok');
 
@@ -393,8 +405,16 @@ describe('page slug auto-generation', () => {
 
   it('appends -2 on slug collision for pages', async () => {
     const ts = Date.now();
-    const r1 = await createPage(env, actor, { titleUk: `Дубль ${ts}`, bodyMdUk: 'Text', status: 'draft' });
-    const r2 = await createPage(env, actor, { titleUk: `Дубль ${ts}`, bodyMdUk: 'Text', status: 'draft' });
+    const r1 = await createPage(env, actor, {
+      titleUk: `Дубль ${ts}`,
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
+    const r2 = await createPage(env, actor, {
+      titleUk: `Дубль ${ts}`,
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
     expect(r1.kind).toBe('ok');
     expect(r2.kind).toBe('ok');
 
@@ -405,14 +425,28 @@ describe('page slug auto-generation', () => {
   });
 
   it('returns slug_taken when explicit slug collides on create', async () => {
-    await createPage(env, actor, { slug: 'contact', titleUk: 'One', bodyMdUk: 'Text', status: 'draft' });
-    const result = await createPage(env, actor, { slug: 'contact', titleUk: 'Two', bodyMdUk: 'Text', status: 'draft' });
+    await createPage(env, actor, {
+      slug: 'contact',
+      titleUk: 'One',
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
+    const result = await createPage(env, actor, {
+      slug: 'contact',
+      titleUk: 'Two',
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
     expect(result.kind).toBe('slug_taken');
   });
 
   it('keeps slug on update when key absent', async () => {
     const ts = Date.now();
-    const created = await createPage(env, actor, { titleUk: `Збережи ${ts}`, bodyMdUk: 'Text', status: 'draft' });
+    const created = await createPage(env, actor, {
+      titleUk: `Збережи ${ts}`,
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
     expect(created.kind).toBe('ok');
 
     const old = await env.DB.prepare('SELECT slug,revision FROM pages WHERE id=?')
@@ -435,7 +469,11 @@ describe('page slug auto-generation', () => {
 
   it('regenerates slug when emptied on update', async () => {
     const ts = Date.now();
-    const created = await createPage(env, actor, { titleUk: `Було ${ts}`, bodyMdUk: 'Text', status: 'draft' });
+    const created = await createPage(env, actor, {
+      titleUk: `Було ${ts}`,
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
     expect(created.kind).toBe('ok');
 
     const old = await env.DB.prepare('SELECT revision FROM pages WHERE id=?')
@@ -459,8 +497,18 @@ describe('page slug auto-generation', () => {
 
   it('returns slug_taken on update when slug collides with another page', async () => {
     const ts = Date.now();
-    const p1 = await createPage(env, actor, { slug: `page-a-${ts}`, titleUk: 'A', bodyMdUk: 'Text', status: 'draft' });
-    const p2 = await createPage(env, actor, { slug: `page-b-${ts}`, titleUk: 'B', bodyMdUk: 'Text', status: 'draft' });
+    const p1 = await createPage(env, actor, {
+      slug: `page-a-${ts}`,
+      titleUk: 'A',
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
+    const p2 = await createPage(env, actor, {
+      slug: `page-b-${ts}`,
+      titleUk: 'B',
+      bodyMdUk: 'Text',
+      status: 'draft',
+    });
     expect(p1.kind).toBe('ok');
     expect(p2.kind).toBe('ok');
 
@@ -486,9 +534,7 @@ describe('concurrent slug uniqueness', () => {
     const title = `Race${Date.now()}`;
     // Fire 5 concurrent creates with the same title
     const results = await Promise.all(
-      Array.from({ length: 5 }, () =>
-        createCategory(env, { titleUk: title, status: 'draft' }),
-      ),
+      Array.from({ length: 5 }, () => createCategory(env, { titleUk: title, status: 'draft' })),
     );
 
     const okResults = results.filter((r) => r.kind === 'ok');

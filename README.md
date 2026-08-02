@@ -23,6 +23,7 @@ pnpm dev
 `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm verify`.
 
 ## Деплой на прод
+
 ```sh
 pnpm wrangler d1 create fauna-db
 pnpm exec wrangler d1 migrations apply fauna-db --env production --remote

@@ -2,6 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { env, SELF } from 'cloudflare:test';
 import type { Bindings, Actor } from '../src/env';
+import { getDashboardStats, type DashboardResponse } from '../src/services/dashboard';
 
 declare module 'cloudflare:test' {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -25,13 +26,13 @@ async function seed() {
     'CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, last_seen_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
   ).run();
   await env.DB.prepare(
-    'CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, parent_id TEXT, slug TEXT UNIQUE NOT NULL, title_uk TEXT NOT NULL, title_en TEXT, description_md_uk TEXT, description_md_en TEXT, seo_title_uk TEXT, seo_title_en TEXT, seo_description_uk TEXT, seo_description_en TEXT, status TEXT NOT NULL DEFAULT \'draft\', is_en_published INTEGER NOT NULL DEFAULT 0, show_in_menu INTEGER NOT NULL DEFAULT 0, menu_order INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0, mutation_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
+    "CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, parent_id TEXT, slug TEXT UNIQUE NOT NULL, title_uk TEXT NOT NULL, title_en TEXT, description_md_uk TEXT, description_md_en TEXT, seo_title_uk TEXT, seo_title_en TEXT, seo_description_uk TEXT, seo_description_en TEXT, status TEXT NOT NULL DEFAULT 'draft', is_en_published INTEGER NOT NULL DEFAULT 0, show_in_menu INTEGER NOT NULL DEFAULT 0, menu_order INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0, mutation_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
   ).run();
   await env.DB.prepare(
-    'CREATE TABLE IF NOT EXISTS media (id TEXT PRIMARY KEY, original_key TEXT, variant_480_key TEXT, variant_960_key TEXT, variant_1600_key TEXT, mime_type TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, size_bytes INTEGER NOT NULL, sha256 TEXT, alt_uk TEXT NOT NULL, alt_en TEXT, caption_uk TEXT, caption_en TEXT, credit TEXT, license TEXT, source_url TEXT, folder TEXT, status TEXT NOT NULL DEFAULT \'processing\', created_by TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
+    "CREATE TABLE IF NOT EXISTS media (id TEXT PRIMARY KEY, original_key TEXT, variant_480_key TEXT, variant_960_key TEXT, variant_1600_key TEXT, mime_type TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, size_bytes INTEGER NOT NULL, sha256 TEXT, alt_uk TEXT NOT NULL, alt_en TEXT, caption_uk TEXT, caption_en TEXT, credit TEXT, license TEXT, source_url TEXT, folder TEXT, status TEXT NOT NULL DEFAULT 'processing', created_by TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
   ).run();
   await env.DB.prepare(
-    'CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title_uk TEXT NOT NULL, title_en TEXT, excerpt_uk TEXT,excerpt_en TEXT, body_md_uk TEXT NOT NULL, body_md_en TEXT, cover_media_id TEXT, status TEXT NOT NULL DEFAULT \'draft\', is_en_published INTEGER NOT NULL DEFAULT 0, published_at TEXT, seo_title_uk TEXT, seo_title_en TEXT, seo_description_uk TEXT, seo_description_en TEXT, created_by TEXT, updated_by TEXT, revision INTEGER NOT NULL DEFAULT 0, mutation_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
+    "CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title_uk TEXT NOT NULL, title_en TEXT, excerpt_uk TEXT,excerpt_en TEXT, body_md_uk TEXT NOT NULL, body_md_en TEXT, cover_media_id TEXT, status TEXT NOT NULL DEFAULT 'draft', is_en_published INTEGER NOT NULL DEFAULT 0, published_at TEXT, seo_title_uk TEXT, seo_title_en TEXT, seo_description_uk TEXT, seo_description_en TEXT, created_by TEXT, updated_by TEXT, revision INTEGER NOT NULL DEFAULT 0, mutation_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
   ).run();
   await env.DB.prepare(
     'CREATE TABLE IF NOT EXISTS post_categories (post_id TEXT NOT NULL, category_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(post_id,category_id))',
@@ -40,7 +41,7 @@ async function seed() {
     'CREATE TABLE IF NOT EXISTS post_media (post_id TEXT NOT NULL, media_id TEXT NOT NULL, role TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY(post_id,media_id))',
   ).run();
   await env.DB.prepare(
-    'CREATE TABLE IF NOT EXISTS pages (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, template TEXT NOT NULL DEFAULT \'default\', title_uk TEXT NOT NULL, title_en TEXT, body_md_uk TEXT NOT NULL, body_md_en TEXT, cover_media_id TEXT, status TEXT NOT NULL DEFAULT \'draft\', is_en_published INTEGER NOT NULL DEFAULT 0, published_at TEXT, show_in_menu INTEGER NOT NULL DEFAULT 0, menu_order INTEGER NOT NULL DEFAULT 0, seo_title_uk TEXT, seo_title_en TEXT, seo_description_uk TEXT, seo_description_en TEXT, created_by TEXT, updated_by TEXT, revision INTEGER NOT NULL DEFAULT 0, mutation_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
+    "CREATE TABLE IF NOT EXISTS pages (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, template TEXT NOT NULL DEFAULT 'default', title_uk TEXT NOT NULL, title_en TEXT, body_md_uk TEXT NOT NULL, body_md_en TEXT, cover_media_id TEXT, status TEXT NOT NULL DEFAULT 'draft', is_en_published INTEGER NOT NULL DEFAULT 0, published_at TEXT, show_in_menu INTEGER NOT NULL DEFAULT 0, menu_order INTEGER NOT NULL DEFAULT 0, seo_title_uk TEXT, seo_title_en TEXT, seo_description_uk TEXT, seo_description_en TEXT, created_by TEXT, updated_by TEXT, revision INTEGER NOT NULL DEFAULT 0, mutation_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
   ).run();
   await env.DB.prepare(
     'CREATE TABLE IF NOT EXISTS page_media (page_id TEXT NOT NULL, media_id TEXT NOT NULL, role TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY(page_id,media_id))',
@@ -52,7 +53,7 @@ async function seed() {
     'CREATE TABLE IF NOT EXISTS redirects (id TEXT PRIMARY KEY, old_path TEXT UNIQUE NOT NULL, new_path TEXT NOT NULL, status_code INTEGER NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, created_at TEXT NOT NULL)',
   ).run();
   await env.DB.prepare(
-    'CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, actor_user_id TEXT, action TEXT NOT NULL, entity_type TEXT, entity_id TEXT, metadata_json TEXT NOT NULL DEFAULT \'{}\', request_id TEXT, created_at TEXT NOT NULL)',
+    "CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, actor_user_id TEXT, action TEXT NOT NULL, entity_type TEXT, entity_id TEXT, metadata_json TEXT NOT NULL DEFAULT '{}', request_id TEXT, created_at TEXT NOT NULL)",
   ).run();
   await env.DB.prepare(
     'CREATE TABLE IF NOT EXISTS rate_limit_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, namespace TEXT NOT NULL, client_key TEXT NOT NULL, created_at TEXT NOT NULL, request_id TEXT)',
@@ -65,9 +66,11 @@ async function seed() {
   ).run();
   try {
     await env.DB.prepare(
-      'CREATE VIRTUAL TABLE IF NOT EXISTS content_fts USING fts5(entity_type, entity_id, locale, title, summary, content, tokenize=\'unicode61\')',
+      "CREATE VIRTUAL TABLE IF NOT EXISTS content_fts USING fts5(entity_type, entity_id, locale, title, summary, content, tokenize='unicode61')",
     ).run();
-  } catch { /* FTS5 may not be available in all test environments */ }
+  } catch {
+    /* FTS5 may not be available in all test environments */
+  }
   await env.DB.prepare(
     `INSERT OR IGNORE INTO users VALUES ('${adminActor.id}','${adminActor.email}','Admin','admin',1,NULL,'${timestamp}','${timestamp}')`,
   ).run();
@@ -204,19 +207,17 @@ describe('posts CRUD', () => {
     let revision = created.data.revision;
 
     // List
-    const list = await SELF.fetch(
-      'https://example.test/api/admin/posts?page=1&pageSize=10',
-      { headers: jsonHeaders() },
-    );
+    const list = await SELF.fetch('https://example.test/api/admin/posts?page=1&pageSize=10', {
+      headers: jsonHeaders(),
+    });
     expect(list.status).toBe(200);
     const listJson = await list.json();
     expect(listJson.data.items.length).toBeGreaterThanOrEqual(1);
 
     // Read
-    const read = await SELF.fetch(
-      `https://example.test/api/admin/posts/${postId}`,
-      { headers: jsonHeaders() },
-    );
+    const read = await SELF.fetch(`https://example.test/api/admin/posts/${postId}`, {
+      headers: jsonHeaders(),
+    });
     expect(read.status).toBe(200);
     const readJson = await read.json();
     expect(readJson.data.slug).toBe('lifecycle-post');
@@ -272,10 +273,10 @@ describe('posts CRUD', () => {
     expect(sm2).not.toContain('/post/lifecycle-post');
 
     // Delete
-    const del = await SELF.fetch(
-      `https://example.test/api/admin/posts/${postId}`,
-      { method: 'DELETE', headers: jsonHeaders() },
-    );
+    const del = await SELF.fetch(`https://example.test/api/admin/posts/${postId}`, {
+      method: 'DELETE',
+      headers: jsonHeaders(),
+    });
     expect(del.status).toBe(200);
   });
 });
@@ -310,19 +311,17 @@ describe('categories CRUD', () => {
     expect(dupJson.error.code).toBe('SLUG_TAKEN');
 
     // List
-    const list = await SELF.fetch(
-      'https://example.test/api/admin/categories?page=1&pageSize=10',
-      { headers: jsonHeaders() },
-    );
+    const list = await SELF.fetch('https://example.test/api/admin/categories?page=1&pageSize=10', {
+      headers: jsonHeaders(),
+    });
     expect(list.status).toBe(200);
     const listJson = await list.json();
     expect(listJson.data.items.length).toBeGreaterThanOrEqual(1);
 
     // Read
-    const read = await SELF.fetch(
-      `https://example.test/api/admin/categories/${catId}`,
-      { headers: jsonHeaders() },
-    );
+    const read = await SELF.fetch(`https://example.test/api/admin/categories/${catId}`, {
+      headers: jsonHeaders(),
+    });
     expect(read.status).toBe(200);
     expect((await read.json()).data.slug).toBe('test-cat');
 
@@ -343,10 +342,9 @@ describe('categories CRUD', () => {
     // Category delete tested in unit tests
 
     // Verify the category still exists (not deleted)
-    const stillThere = await SELF.fetch(
-      `https://example.test/api/admin/categories/${catId}`,
-      { headers: jsonHeaders() },
-    );
+    const stillThere = await SELF.fetch(`https://example.test/api/admin/categories/${catId}`, {
+      headers: jsonHeaders(),
+    });
     expect(stillThere.status).toBe(200);
   });
 });
@@ -392,19 +390,18 @@ describe('pages CRUD', () => {
     // Page listing test (public rendering may 500 due to sanitize-html in workerd)
 
     // List
-    const list = await SELF.fetch(
-      'https://example.test/api/admin/pages?page=1&pageSize=10',
-      { headers: jsonHeaders() },
-    );
+    const list = await SELF.fetch('https://example.test/api/admin/pages?page=1&pageSize=10', {
+      headers: jsonHeaders(),
+    });
     expect(list.status).toBe(200);
     const listJson = await list.json();
     expect(listJson.data.items.length).toBeGreaterThanOrEqual(1);
 
     // Delete
-    const del = await SELF.fetch(
-      `https://example.test/api/admin/pages/${pageId}`,
-      { method: 'DELETE', headers: jsonHeaders() },
-    );
+    const del = await SELF.fetch(`https://example.test/api/admin/pages/${pageId}`, {
+      method: 'DELETE',
+      headers: jsonHeaders(),
+    });
     expect(del.status).toBe(200);
   });
 });
@@ -442,19 +439,17 @@ describe('users CRUD', () => {
     expect((await dup.json()).error.code).toBe('EMAIL_TAKEN');
 
     // List
-    const list = await SELF.fetch(
-      'https://example.test/api/admin/users?page=1&pageSize=10',
-      { headers: jsonHeaders() },
-    );
+    const list = await SELF.fetch('https://example.test/api/admin/users?page=1&pageSize=10', {
+      headers: jsonHeaders(),
+    });
     expect(list.status).toBe(200);
     const listJson = await list.json();
     expect(listJson.data.items.length).toBeGreaterThanOrEqual(2);
 
     // Read
-    const read = await SELF.fetch(
-      `https://example.test/api/admin/users/${userId}`,
-      { headers: jsonHeaders() },
-    );
+    const read = await SELF.fetch(`https://example.test/api/admin/users/${userId}`, {
+      headers: jsonHeaders(),
+    });
     expect(read.status).toBe(200);
     expect((await read.json()).data.email).toBe('newuser@example.test');
 
@@ -472,24 +467,23 @@ describe('users CRUD', () => {
     expect(upd.status).toBe(200);
 
     // Delete
-    const del = await SELF.fetch(
-      `https://example.test/api/admin/users/${userId}`,
-      { method: 'DELETE', headers: jsonHeaders() },
-    );
+    const del = await SELF.fetch(`https://example.test/api/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: jsonHeaders(),
+    });
     expect(del.status).toBe(200);
 
     // 404 after delete
-    const gone = await SELF.fetch(
-      `https://example.test/api/admin/users/non-existent`,
-      { headers: jsonHeaders() },
-    );
+    const gone = await SELF.fetch(`https://example.test/api/admin/users/non-existent`, {
+      headers: jsonHeaders(),
+    });
     expect(gone.status).toBe(404);
 
     // Self-deletion prevention (the admin actor matches DEV_AUTH_EMAIL)
-    const selfDel = await SELF.fetch(
-      `https://example.test/api/admin/users/${adminActor.id}`,
-      { method: 'DELETE', headers: jsonHeaders() },
-    );
+    const selfDel = await SELF.fetch(`https://example.test/api/admin/users/${adminActor.id}`, {
+      method: 'DELETE',
+      headers: jsonHeaders(),
+    });
     expect(selfDel.status).toBe(422);
     const selfDelErr = await selfDel.json();
     expect(['SELF_DELETE', 'LAST_ADMIN']).toContain(selfDelErr.error.code);
@@ -520,16 +514,142 @@ describe('settings', () => {
 // Dashboard
 // =========================================================================
 describe('dashboard', () => {
-  it('returns stats', async () => {
+  it('selects bounded queues and only exposes audits to admins', async () => {
+    const queueSeoPost = '00000000-0000-4000-8000-000000000101';
+    const queueEnglishPost = '00000000-0000-4000-8000-000000000102';
+    const queueMedia = '00000000-0000-4000-8000-000000000103';
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT OR REPLACE INTO posts(id,slug,title_uk,title_en,excerpt_uk,excerpt_en,body_md_uk,body_md_en,status,is_en_published,published_at,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at,revision,mutation_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      ).bind(
+        queueSeoPost,
+        'dashboard-seo-queue',
+        'Чернетка без SEO',
+        null,
+        null,
+        null,
+        'Текст',
+        null,
+        'draft',
+        0,
+        null,
+        null,
+        null,
+        '',
+        null,
+        adminActor.id,
+        adminActor.id,
+        timestamp,
+        '2026-01-02T00:00:00.000Z',
+        0,
+        null,
+      ),
+      env.DB.prepare(
+        'INSERT OR REPLACE INTO posts(id,slug,title_uk,title_en,excerpt_uk,excerpt_en,body_md_uk,body_md_en,status,is_en_published,published_at,seo_title_uk,seo_title_en,seo_description_uk,seo_description_en,created_by,updated_by,created_at,updated_at,revision,mutation_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      ).bind(
+        queueEnglishPost,
+        'dashboard-english-queue',
+        'Публікація без English',
+        'English title',
+        null,
+        null,
+        'Текст',
+        null,
+        'published',
+        0,
+        '2026-01-02T00:00:00.000Z',
+        null,
+        null,
+        'Опис',
+        null,
+        adminActor.id,
+        adminActor.id,
+        timestamp,
+        '2026-01-02T00:00:00.000Z',
+        0,
+        null,
+      ),
+      env.DB.prepare(
+        'INSERT OR REPLACE INTO media(id,original_key,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,sha256,alt_uk,alt_en,caption_uk,caption_en,credit,license,source_url,folder,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      ).bind(
+        queueMedia,
+        'dashboard/original.webp',
+        'dashboard/480.webp',
+        'dashboard/960.webp',
+        'dashboard/1600.webp',
+        'image/webp',
+        480,
+        320,
+        1024,
+        null,
+        '',
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        '',
+        'ready',
+        adminActor.id,
+        timestamp,
+        '2026-01-02T00:00:00.000Z',
+      ),
+    ]);
+
     const r = await SELF.fetch('https://example.test/api/admin/dashboard', {
       headers: jsonHeaders(),
     });
     expect(r.status).toBe(200);
-    const json = await r.json();
-    expect(json.data).toHaveProperty('posts');
-    expect(json.data).toHaveProperty('pages');
-    expect(json.data).toHaveProperty('categories');
-    expect(json.data).toHaveProperty('media');
+    const json = (await r.json()) as { data: DashboardResponse };
+    expect(json.data.queues.missingSeoUk.length).toBeLessThanOrEqual(8);
+    expect(json.data.queues.missingMediaAltUk.length).toBeLessThanOrEqual(8);
+    expect(json.data.queues.englishUnpublished.length).toBeLessThanOrEqual(8);
+    expect(json.data.queues.missingSeoUk.some((item) => item.id === queueSeoPost)).toBe(true);
+    expect(json.data.queues.missingMediaAltUk.some((item) => item.id === queueMedia)).toBe(true);
+    expect(json.data.queues.englishUnpublished.some((item) => item.id === queueEnglishPost)).toBe(
+      true,
+    );
+    expect(json.data.recent.audits).toBeDefined();
+
+    const editorData = await getDashboardStats(env, {
+      id: '00000000-0000-4000-8000-000000000002',
+      email: 'editor@example.test',
+      name: 'Editor',
+      role: 'editor',
+    });
+    expect(editorData.recent.audits).toBeUndefined();
+  });
+});
+
+describe('admin register filters', () => {
+  it('rejects unchecked sort values before querying the register', async () => {
+    const response = await SELF.fetch(
+      'https://example.test/api/admin/posts?sort=updated_at%20DESC',
+      {
+        headers: jsonHeaders(),
+      },
+    );
+    expect(response.status).toBe(400);
+    const json = (await response.json()) as { error?: { code: string } };
+    expect(json.error?.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('validates page sort and media alt filters', async () => {
+    const pageResponse = await SELF.fetch(
+      'https://example.test/api/admin/pages?sort=title%20DESC',
+      {
+        headers: jsonHeaders(),
+      },
+    );
+    expect(pageResponse.status).toBe(400);
+
+    const mediaResponse = await SELF.fetch('https://example.test/api/admin/media?alt=present', {
+      headers: jsonHeaders(),
+    });
+    expect(mediaResponse.status).toBe(400);
+    const json = (await mediaResponse.json()) as { error?: { code: string } };
+    expect(json.error?.code).toBe('VALIDATION_ERROR');
   });
 });
 
@@ -595,10 +715,9 @@ describe('redirects after slug change', () => {
 // =========================================================================
 describe('audit log', () => {
   it('lists audit log entries (may be empty)', async () => {
-    const r = await SELF.fetch(
-      'https://example.test/api/admin/audit-log?page=1&pageSize=20',
-      { headers: jsonHeaders() },
-    );
+    const r = await SELF.fetch('https://example.test/api/admin/audit-log?page=1&pageSize=20', {
+      headers: jsonHeaders(),
+    });
     expect(r.status).toBe(200);
     const json = await r.json();
     expect(json.data).toHaveProperty('items');
@@ -693,9 +812,7 @@ describe('search API', () => {
   });
 
   it('returns empty for non-matching query (skip if FTS unavailable)', async () => {
-    const r = await SELF.fetch(
-      'https://example.test/api/search?q=xyznonexistent&locale=uk',
-    );
+    const r = await SELF.fetch('https://example.test/api/search?q=xyznonexistent&locale=uk');
     // FTS5 may not be available in test workers, accept 500
     expect([200, 500]).toContain(r.status);
   });

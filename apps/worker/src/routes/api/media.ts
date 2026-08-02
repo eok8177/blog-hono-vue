@@ -1,5 +1,12 @@
 import type { Hono } from 'hono';
-import { apiError, apiSuccess, mediaBatchMoveSchema, mediaUpdateSchema, paginationSchema } from '@fauna/shared';
+import {
+  apiError,
+  apiSuccess,
+  mediaBatchMoveSchema,
+  mediaUpdateSchema,
+  paginationSchema,
+} from '@fauna/shared';
+import { z } from 'zod';
 import type { AppEnv } from '../../index';
 import { requireAdmin } from '../../middleware/auth';
 import { inspectImage, sha256 } from '../../utils/media';
@@ -10,6 +17,9 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
     const pagination = paginationSchema.parse(c.req.query());
     const search = (c.req.query('q') ?? '').slice(0, 100);
     const folder = (c.req.query('folder') ?? '').slice(0, 200);
+    const alt = c.req.query('alt') ?? '';
+    if (!z.enum(['', 'missing']).safeParse(alt).success)
+      return c.json(apiError('VALIDATION_ERROR', 'Некоректний фільтр alt'), 400);
     const conditions: string[] = [];
     const args: (string | number)[] = [];
     if (search) {
@@ -20,6 +30,7 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
       conditions.push('folder = ?');
       args.push(folder);
     }
+    if (alt === 'missing') conditions.push("(alt_uk IS NULL OR trim(alt_uk) = '')");
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const results = await c.env.DB.batch([
       c.env.DB.prepare(
@@ -290,7 +301,10 @@ export function registerMediaRoutes(app: Hono<AppEnv>) {
       );
       const id = crypto.randomUUID();
       const timestamp = new Date().toISOString();
-      const folder = typeof form.get('folder') === 'string' ? String(form.get('folder')).trim().slice(0, 200) : '';
+      const folder =
+        typeof form.get('folder') === 'string'
+          ? String(form.get('folder')).trim().slice(0, 200)
+          : '';
       const largest = inspected[2]!;
       await c.env.DB.prepare(
         'INSERT INTO media(id,original_key,variant_480_key,variant_960_key,variant_1600_key,mime_type,width,height,size_bytes,sha256,alt_uk,alt_en,caption_uk,caption_en,credit,license,source_url,folder,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',

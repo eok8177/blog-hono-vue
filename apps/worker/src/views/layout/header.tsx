@@ -27,9 +27,13 @@ export const Header: FC<{
           <div class="nav-menu" id="nav-menu">
             <div class="nav-menu-panel">
               {menuItems.map((item) => (
-                <a class="nav-menu-link" href={item.href}>{item.label}</a>
+                <a class="nav-menu-link" href={item.href}>
+                  {item.label}
+                </a>
               ))}
-              <a class="nav-menu-link" href={lang === 'uk' ? '/search' : '/en/search'}>{search}</a>
+              <a class="nav-menu-link" href={lang === 'uk' ? '/search' : '/en/search'}>
+                {search}
+              </a>
             </div>
           </div>
           <div class="nav-actions">

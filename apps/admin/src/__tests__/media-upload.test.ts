@@ -20,9 +20,8 @@ describe('media upload orchestration', () => {
     } as unknown as CanvasRenderingContext2D);
     HTMLCanvasElement.prototype.toBlob = vi
       .fn()
-      .mockImplementation(
-        (cb: (blob: Blob | null) => void) =>
-          cb(new Blob(['fake-webp'], { type: 'image/webp' })),
+      .mockImplementation((cb: (blob: Blob | null) => void) =>
+        cb(new Blob(['fake-webp'], { type: 'image/webp' })),
       );
 
     globalThis.fetch = vi.fn();

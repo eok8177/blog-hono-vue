@@ -53,8 +53,5 @@ defineExpose({
 </script>
 
 <template>
-  <div
-    ref="editorRoot"
-    class="milkdown-editor-host"
-  />
+  <div ref="editorRoot" class="milkdown-editor-host" />
 </template>

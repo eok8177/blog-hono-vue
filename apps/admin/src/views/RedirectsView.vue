@@ -19,9 +19,7 @@ const pageSize = 10;
 const redirects = useQuery({
   queryKey: computed(() => ['redirects', page.value]),
   queryFn: () =>
-    api<{ items: Redirect[]; total: number }>(
-      `/redirects?page=${page.value}&pageSize=${pageSize}`,
-    ),
+    api<{ items: Redirect[]; total: number }>(`/redirects?page=${page.value}&pageSize=${pageSize}`),
 });
 const items = computed(() => redirects.data.value?.items ?? []);
 const totalPages = computed(() =>
@@ -94,11 +92,7 @@ async function remove(redirect: Redirect) {
           </tr>
         </tbody>
       </table>
-      <AdminPagination
-        :page="page"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-      />
+      <AdminPagination :page="page" :total-pages="totalPages" @update:page="page = $event" />
     </div>
   </section>
 </template>

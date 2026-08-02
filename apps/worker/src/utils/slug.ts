@@ -8,11 +8,42 @@ export type SlugTable = 'categories' | 'posts' | 'pages';
  * Handles the most common characters; others pass through.
  */
 const CYRILLIC_TO_LATIN: Record<string, string> = {
-  а: 'a', б: 'b', в: 'v', г: 'h', ґ: 'g', д: 'd', е: 'e', є: 'ie',
-  ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'i', й: 'i', к: 'k', л: 'l',
-  м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u',
-  ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch', ь: '',
-  ю: 'iu', я: 'ia', '’': '', "'": '', 'ʼ': '',
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'h',
+  ґ: 'g',
+  д: 'd',
+  е: 'e',
+  є: 'ie',
+  ж: 'zh',
+  з: 'z',
+  и: 'y',
+  і: 'i',
+  ї: 'i',
+  й: 'i',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'kh',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'shch',
+  ь: '',
+  ю: 'iu',
+  я: 'ia',
+  '’': '',
+  "'": '',
+  ʼ: '',
 };
 
 function transliterateUkrainian(text: string): string {
@@ -56,7 +87,9 @@ export async function ensureUniqueSlug(
       ? `SELECT id FROM ${table} WHERE slug=? AND id != ?`
       : `SELECT id FROM ${table} WHERE slug=?`;
     const args = excludeId ? [slug, excludeId] : [slug];
-    const existing = await env.DB.prepare(query).bind(...args).first();
+    const existing = await env.DB.prepare(query)
+      .bind(...args)
+      .first();
     if (!reservedSlugs.has(slug) && !existing) return slug;
     suffixNumber++;
   }
@@ -81,10 +114,7 @@ export function isSlugUniqueConstraint(error: unknown, table: SlugTable): boolea
  * - Update: auto-gen *only* when slug was explicitly emptied (null / "").
  *   When the key is absent entirely the caller should keep the current slug.
  */
-export function shouldAutoGenerateSlug(
-  body: unknown,
-  isCreate: boolean,
-): boolean {
+export function shouldAutoGenerateSlug(body: unknown, isCreate: boolean): boolean {
   if (!body || typeof body !== 'object') return isCreate;
 
   const slug = (body as Record<string, unknown>).slug;
@@ -152,7 +182,6 @@ export class SlugTakenError extends Error {
     this.name = 'SlugTakenError';
   }
 }
-
 
 /** Check if the given value should be treated as "slug explicitly emptied by client". */
 export function isSlugExplicitlyEmpty(body: unknown): boolean {

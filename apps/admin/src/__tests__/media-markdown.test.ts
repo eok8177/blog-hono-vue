@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildImageMarkdown,
   copyImageMarkdown,
@@ -69,9 +69,7 @@ describe('copyImageMarkdown', () => {
     });
 
     await copyImageMarkdown({ url: '/media/abc/960', alt: 'Test' });
-    expect(writeText).toHaveBeenCalledWith(
-      expect.stringContaining('/media/abc/960'),
-    );
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/media/abc/960'));
   });
 
   it('throws on invalid URL', async () => {

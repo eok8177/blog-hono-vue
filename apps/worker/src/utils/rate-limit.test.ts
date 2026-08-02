@@ -19,7 +19,7 @@ function mockContext(overrides?: Partial<Context<AppEnv>>): Context<AppEnv> {
       routeIndex: 0,
       routePath: '/test',
       queries: {},
-      query: (key: string) => undefined,
+      query: () => undefined,
       param: () => '',
       parseBody: async () => ({}),
       json: async () => ({}),
@@ -123,7 +123,7 @@ describe('rateLimit utility', () => {
     const ctx = mockContext({
       env: {
         DB: {
-          prepare: (sql: string) => ({
+          prepare: () => ({
             bind: (...args: unknown[]) => {
               usedKey = String(args[1]); // client_key is second param
               return {

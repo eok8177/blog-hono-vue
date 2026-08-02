@@ -33,9 +33,7 @@ export const slugSchema = z
  */
 export const optionalSlugSchema = z.preprocess(
   (v) =>
-    v === null || v === undefined || (typeof v === 'string' && v.trim() === '')
-      ? undefined
-      : v,
+    v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ? undefined : v,
   slugSchema.optional(),
 );
 export const paginationSchema = z.object({

@@ -76,7 +76,6 @@ test.describe('keyboard navigation', () => {
     await page.goto('/search');
     // Tab through form elements
     await page.keyboard.press('Tab');
-    const input = page.locator('input[name="q"], input[type="search"]');
     // The input should be reachable
   });
 

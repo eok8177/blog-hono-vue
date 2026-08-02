@@ -47,8 +47,6 @@ type StoredPage = {
   mediaIds: string[];
 };
 
-
-
 onMounted(async () => {
   try {
     if (!id) return;
@@ -128,7 +126,11 @@ async function save() {
     <p v-if="loading" class="admin-state">Завантаження…</p>
     <form v-else class="admin-editor-form" @submit.prevent="save">
       <p v-if="error" role="alert">{{ error }}</p>
-      <label>Slug <input v-model="form.slug" pattern="[a-z0-9-]+" /><small v-if="!form.slug.trim()">Згенерується з назви автоматично</small></label>
+      <label
+        >Slug <input v-model="form.slug" pattern="[a-z0-9-]+" /><small v-if="!form.slug.trim()"
+          >Згенерується з назви автоматично</small
+        ></label
+      >
       <div class="admin-form-grid">
         <label>Назва українською <input v-model="form.titleUk" required /></label>
         <label>Title English <input v-model="form.titleEn" /></label>
@@ -143,8 +145,7 @@ async function save() {
       </div>
       <div class="admin-editor-columns">
         <label class="admin-editor-label"
-          >Текст українською
-          <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk" /></label
+          >Текст українською <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk" /></label
         ><label class="admin-editor-label"
           >Text English <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn"
         /></label>

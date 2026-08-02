@@ -13,14 +13,10 @@ const emit = defineEmits<{
     <span>Сторінка {{ page }} з {{ totalPages }}</span>
     <div>
       <button type="button" :disabled="page === 1" @click="emit('update:page', page - 1)">
-        ← Назад
+        Назад
       </button>
-      <button
-        type="button"
-        :disabled="page >= totalPages"
-        @click="emit('update:page', page + 1)"
-      >
-        Далі →
+      <button type="button" :disabled="page >= totalPages" @click="emit('update:page', page + 1)">
+        Далі
       </button>
     </div>
   </div>

@@ -14,9 +14,7 @@ export const Footer: FC<{
         <p>{footer}</p>
       </div>
       <div class="footer-meta">
-        <span class="small-caps">
-          {lang === 'uk' ? 'Південна Україна' : 'Southern Ukraine'}
-        </span>
+        <span class="small-caps">{lang === 'uk' ? 'Південна Україна' : 'Southern Ukraine'}</span>
         <span class="footer-rule" aria-hidden="true" />
         <span>© {new Date().getFullYear()}</span>
       </div>

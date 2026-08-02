@@ -15,9 +15,7 @@ const pageSize = 20;
 const events = useQuery({
   queryKey: computed(() => ['audit-log', page.value]),
   queryFn: () =>
-    api<{ items: Event[]; total: number }>(
-      `/audit-log?page=${page.value}&pageSize=${pageSize}`,
-    ),
+    api<{ items: Event[]; total: number }>(`/audit-log?page=${page.value}&pageSize=${pageSize}`),
 });
 const items = computed(() => events.data.value?.items ?? []);
 const totalPages = computed(() =>
@@ -57,11 +55,7 @@ const totalPages = computed(() =>
           </tr>
         </tbody>
       </table>
-      <AdminPagination
-        :page="page"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-      />
+      <AdminPagination :page="page" :total-pages="totalPages" @update:page="page = $event" />
     </div>
   </section>
 </template>
