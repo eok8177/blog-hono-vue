@@ -25,6 +25,10 @@ onMounted(async () => {
   crepe = new Crepe({
     root: editorRoot.value,
     defaultValue: props.modelValue ?? '',
+    features: {
+      [Crepe.Feature.Cursor]: false,
+      [Crepe.Feature.ImageBlock]: false,
+    },
   });
 
   crepe.on((listener) => {

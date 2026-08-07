@@ -68,6 +68,31 @@ test.describe('admin authentication flow', () => {
   });
 });
 
+test.describe('Milkdown editor', () => {
+  test('clicking text after an image leaves the caret in that text', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto('/admin/posts/new');
+
+    const editor = page.locator('.milkdown .ProseMirror').first();
+    await expect(editor).not.toHaveClass(/virtual-cursor-enabled/);
+    await editor.click();
+    await page.evaluate(() =>
+      navigator.clipboard.writeText('![1](https://example.test/image.png "мак")\n\nдалі йде текст'),
+    );
+    await page.keyboard.press('Control+V');
+
+    await expect(editor.locator('img[src="https://example.test/image.png"]')).toHaveCount(1);
+    await expect(editor.locator('.caption-input')).toHaveCount(0);
+
+    const textAfterImage = editor.locator('p', { hasText: 'далі йде текст' });
+    await textAfterImage.click({ position: { x: 20, y: 10 } });
+    await page.keyboard.type('!');
+
+    await expect(editor.locator('p').last()).toContainText('!');
+    await expect(editor).toBeFocused();
+  });
+});
+
 test.describe('full content lifecycle', () => {
   const ukSlug = `e2e-test-${Date.now()}`;
   test('1. Navigate public homepages', async ({ page }) => {
