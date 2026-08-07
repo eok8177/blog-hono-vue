@@ -36,6 +36,7 @@ const newFolderName = ref('');
 const showNewFolderInput = ref(false);
 const selectedIds = ref<Set<string>>(new Set());
 const batchFolder = ref('');
+const activeMetadataLocale = ref<'uk' | 'en'>('uk');
 
 const client = useQueryClient();
 
@@ -259,7 +260,7 @@ watch([folderFilter, mediaSearch, altFilter], () => {
     </div>
 
     <!-- Folder toolbar -->
-    <div class="admin-folder-toolbar">
+    <div class="admin-folder-toolbar admin-media-toolbar">
       <label class="admin-search"
         ><span class="sr-only">Пошук медіа</span><CatalogueIcon name="search" /><input
           v-model="mediaSearch"
@@ -328,85 +329,87 @@ watch([folderFilter, mediaSearch, altFilter], () => {
 
     <!-- Upload form -->
     <form class="admin-upload-card" @submit.prevent="upload.mutate()">
-      <div class="admin-upload-icon" aria-hidden="true"><CatalogueIcon name="photo" /></div>
-      <div>
-        <h2>Додати зображення</h2>
-        <p>JPEG, PNG або WebP. Варіанти створюються автоматично.</p>
-      </div>
-
-      <label class="admin-file-input"
-        >Вибрати файл<input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          required
-          :disabled="upload.isPending.value"
-          @change="selected"
-      /></label>
-
-      <label class="admin-upload-alt"
-        >Alt українською<input v-model="altUk" required placeholder="Опишіть зображення"
-      /></label>
-
-      <label class="admin-upload-folder"
-        >Папка
-        <input
-          v-model="uploadFolder"
-          placeholder="або тека"
-          :list="'folder-options'"
-          maxlength="200"
-        />
-        <datalist id="folder-options">
-          <option v-for="f in folders.data.value?.folders ?? []" :key="f" :value="f" />
-        </datalist>
-      </label>
-
-      <label class="admin-checkbox">
-        <input v-model="keepOriginal" type="checkbox" :disabled="upload.isPending.value" />
-        Зберегти оригінал
-      </label>
-
-      <!-- Progress bar -->
-      <div v-if="uploadProgress" class="admin-upload-progress">
-        <div class="admin-progress-bar">
-          <span
-            class="admin-progress-fill"
-            :class="{
-              'admin-progress-error': uploadProgress.stage === 'error',
-              'admin-progress-done': uploadProgress.stage === 'done',
-            }"
-            :style="{ width: uploadProgress.percent + '%' }"
-          />
+      <div class="admin-upload-heading">
+        <div class="admin-upload-icon" aria-hidden="true"><CatalogueIcon name="photo" /></div>
+        <div>
+          <h2>Додати зображення</h2>
+          <p>JPEG, PNG або WebP. Варіанти створюються автоматично.</p>
         </div>
-        <p class="admin-progress-label">{{ uploadProgress.message }}</p>
       </div>
+      <div class="admin-upload-fields">
+        <label class="admin-file-input"
+          >Вибрати файл<input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            required
+            :disabled="upload.isPending.value"
+            @change="selected"
+        /></label>
+        <label class="admin-upload-alt"
+          >Alt українською<input v-model="altUk" required placeholder="Опишіть зображення"
+        /></label>
+        <label class="admin-upload-folder"
+          >Папка
+          <input
+            v-model="uploadFolder"
+            placeholder="або тека"
+            :list="'folder-options'"
+            maxlength="200"
+          />
+          <datalist id="folder-options">
+            <option v-for="f in folders.data.value?.folders ?? []" :key="f" :value="f" />
+          </datalist>
+        </label>
+      </div>
+      <div class="admin-upload-footer">
+        <label class="admin-checkbox">
+          <input v-model="keepOriginal" type="checkbox" :disabled="upload.isPending.value" />
+          Зберегти оригінал
+        </label>
 
-      <div class="admin-upload-actions">
-        <button
-          v-if="uploadProgress?.stage === 'converting' || uploadProgress?.stage === 'uploading'"
-          type="button"
-          class="admin-secondary-button"
-          @click="cancelUpload()"
-        >
-          Скасувати
-        </button>
+        <!-- Progress bar -->
+        <div v-if="uploadProgress" class="admin-upload-progress">
+          <div class="admin-progress-bar">
+            <span
+              class="admin-progress-fill"
+              :class="{
+                'admin-progress-error': uploadProgress.stage === 'error',
+                'admin-progress-done': uploadProgress.stage === 'done',
+              }"
+              :style="{ width: uploadProgress.percent + '%' }"
+            />
+          </div>
+          <p class="admin-progress-label">{{ uploadProgress.message }}</p>
+        </div>
 
-        <button
-          v-if="uploadProgress?.stage === 'error'"
-          type="button"
-          class="button"
-          @click="retry"
-        >
-          Повторити
-        </button>
+        <div class="admin-upload-actions">
+          <button
+            v-if="uploadProgress?.stage === 'converting' || uploadProgress?.stage === 'uploading'"
+            type="button"
+            class="admin-secondary-button"
+            @click="cancelUpload()"
+          >
+            Скасувати
+          </button>
 
-        <button
-          v-else-if="
-            uploadProgress?.stage !== 'converting' && uploadProgress?.stage !== 'uploading'
-          "
-          :disabled="upload.isPending.value"
-        >
-          {{ upload.isPending.value ? 'Конвертація…' : 'Завантажити' }}
-        </button>
+          <button
+            v-if="uploadProgress?.stage === 'error'"
+            type="button"
+            class="button"
+            @click="retry"
+          >
+            Повторити
+          </button>
+
+          <button
+            v-else-if="
+              uploadProgress?.stage !== 'converting' && uploadProgress?.stage !== 'uploading'
+            "
+            :disabled="upload.isPending.value"
+          >
+            {{ upload.isPending.value ? 'Конвертація…' : 'Завантажити' }}
+          </button>
+        </div>
       </div>
     </form>
 
@@ -428,14 +431,60 @@ watch([folderFilter, mediaSearch, altFilter], () => {
           <CatalogueIcon name="close" />
         </button>
       </div>
-      <div class="admin-form-grid">
-        <label>Alt українською <input v-model="form.altUk" required /></label
-        ><label>Alt English <input v-model="form.altEn" /></label
-        ><label>Credit <input v-model="form.credit" /></label
-        ><label>License <input v-model="form.license" /></label
-        ><label>Caption <input v-model="form.captionUk" /></label
-        ><label>Source URL <input v-model="form.sourceUrl" type="url" /></label
-        ><label
+      <section class="admin-language-section" aria-label="Мовні метадані зображення">
+        <div class="admin-language-tabs" role="tablist" aria-label="Мова метаданих">
+          <button
+            id="media-locale-uk-tab"
+            class="admin-language-tab"
+            :class="{ 'admin-language-tab-active': activeMetadataLocale === 'uk' }"
+            type="button"
+            role="tab"
+            :aria-selected="activeMetadataLocale === 'uk'"
+            aria-controls="media-locale-uk-panel"
+            @click="activeMetadataLocale = 'uk'"
+          >
+            Українська
+          </button>
+          <button
+            id="media-locale-en-tab"
+            class="admin-language-tab"
+            :class="{ 'admin-language-tab-active': activeMetadataLocale === 'en' }"
+            type="button"
+            role="tab"
+            :aria-selected="activeMetadataLocale === 'en'"
+            aria-controls="media-locale-en-panel"
+            @click="activeMetadataLocale = 'en'"
+          >
+            English
+          </button>
+        </div>
+        <div
+          id="media-locale-uk-panel"
+          v-show="activeMetadataLocale === 'uk'"
+          class="admin-language-panel"
+          role="tabpanel"
+          aria-labelledby="media-locale-uk-tab"
+        >
+          <label>Alt українською <input v-model="form.altUk" required /></label>
+          <label>Підпис <input v-model="form.captionUk" /></label>
+        </div>
+        <div
+          id="media-locale-en-panel"
+          v-show="activeMetadataLocale === 'en'"
+          class="admin-language-panel"
+          role="tabpanel"
+          aria-labelledby="media-locale-en-tab"
+        >
+          <label>Alt English <input v-model="form.altEn" /></label>
+          <label>Caption <input v-model="form.captionEn" /></label>
+        </div>
+      </section>
+      <fieldset class="admin-editor-section admin-media-details">
+        <legend>Джерело та права</legend>
+        <label>Credit <input v-model="form.credit" /></label>
+        <label>License <input v-model="form.license" /></label>
+        <label>Source URL <input v-model="form.sourceUrl" type="url" /></label>
+        <label
           >Папка
           <input
             v-model="form.folder"
@@ -447,13 +496,15 @@ watch([folderFilter, mediaSearch, altFilter], () => {
             <option v-for="f in folders.data.value?.folders ?? []" :key="f" :value="f" />
           </datalist>
         </label>
-      </div>
-      <div class="admin-form-actions">
-        <button :disabled="save.isPending.value">
-          {{ save.isPending.value ? 'Збереження…' : 'Зберегти metadata' }}</button
-        ><button type="button" class="admin-secondary-button" @click="selectedId = undefined">
-          Скасувати
-        </button>
+      </fieldset>
+      <div class="admin-editor-actions">
+        <div class="admin-editor-actions-buttons">
+          <button :disabled="save.isPending.value">
+            {{ save.isPending.value ? 'Збереження…' : 'Зберегти metadata' }}</button
+          ><button type="button" class="admin-secondary-button" @click="selectedId = undefined">
+            Скасувати
+          </button>
+        </div>
       </div>
     </form>
 

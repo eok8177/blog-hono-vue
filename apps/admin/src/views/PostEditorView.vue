@@ -32,6 +32,7 @@ const error = ref('');
 const saving = ref(false);
 const loading = ref(Boolean(id));
 const dirty = ref(false);
+const activeLocale = ref<'uk' | 'en'>('uk');
 type StoredPost = {
   slug: string;
   title_uk: string;
@@ -142,25 +143,74 @@ async function save() {
           >Згенерується з назви автоматично</small
         ></label
       >
-      <div class="admin-editor-columns">
-        <label>Український заголовок <input v-model="form.titleUk" required /></label
-        ><label>English title <input v-model="form.titleEn" /></label>
-      </div>
-      <div class="admin-editor-columns">
-        <label>Короткий вступ <textarea v-model="form.excerptUk" rows="3" /></label
-        ><label>English excerpt <textarea v-model="form.excerptEn" rows="3" /></label>
-      </div>
-      <div class="admin-editor-columns">
-        <label class="admin-editor-label"
-          >Український текст <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk" /></label
-        ><label class="admin-editor-label"
-          >English body <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn"
-        /></label>
-      </div>
-      <label class="admin-checkbox"
-        ><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label
-      >
-      <fieldset>
+      <section class="admin-language-section" aria-label="Мовні версії публікації">
+        <div class="admin-language-tabs" role="tablist" aria-label="Мова публікації">
+          <button
+            id="post-locale-uk-tab"
+            class="admin-language-tab"
+            :class="{ 'admin-language-tab-active': activeLocale === 'uk' }"
+            type="button"
+            role="tab"
+            :aria-selected="activeLocale === 'uk'"
+            aria-controls="post-locale-uk-panel"
+            @click="activeLocale = 'uk'"
+          >
+            Українська
+          </button>
+          <button
+            id="post-locale-en-tab"
+            class="admin-language-tab"
+            :class="{ 'admin-language-tab-active': activeLocale === 'en' }"
+            type="button"
+            role="tab"
+            :aria-selected="activeLocale === 'en'"
+            aria-controls="post-locale-en-panel"
+            @click="activeLocale = 'en'"
+          >
+            English
+          </button>
+        </div>
+        <div
+          id="post-locale-uk-panel"
+          v-show="activeLocale === 'uk'"
+          class="admin-language-panel"
+          role="tabpanel"
+          aria-labelledby="post-locale-uk-tab"
+        >
+          <label>Український заголовок <input v-model="form.titleUk" required /></label>
+          <label>Короткий вступ <textarea v-model="form.excerptUk" rows="3" /></label>
+          <label class="admin-editor-label"
+            >Український текст <MilkdownEditor ref="bodyEditorUk" v-model="form.bodyMdUk"
+          /></label>
+          <fieldset class="admin-editor-section admin-seo-section">
+            <legend>SEO · Українська</legend>
+            <label>SEO title <input v-model="form.seoTitleUk" /></label>
+            <label>SEO description <textarea v-model="form.seoDescriptionUk" rows="3" /></label>
+          </fieldset>
+        </div>
+        <div
+          id="post-locale-en-panel"
+          v-show="activeLocale === 'en'"
+          class="admin-language-panel"
+          role="tabpanel"
+          aria-labelledby="post-locale-en-tab"
+        >
+          <label>English title <input v-model="form.titleEn" /></label>
+          <label>English excerpt <textarea v-model="form.excerptEn" rows="3" /></label>
+          <label class="admin-editor-label"
+            >English body <MilkdownEditor ref="bodyEditorEn" v-model="form.bodyMdEn"
+          /></label>
+          <fieldset class="admin-editor-section admin-seo-section">
+            <legend>SEO · English</legend>
+            <label>SEO title <input v-model="form.seoTitleEn" /></label>
+            <label>SEO description <textarea v-model="form.seoDescriptionEn" rows="3" /></label>
+          </fieldset>
+          <label class="admin-checkbox"
+            ><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label
+          >
+        </div>
+      </section>
+      <fieldset class="admin-editor-section">
         <legend>Категорії</legend>
         <p v-if="!availableCategories.length">Категорій ще немає.</p>
         <label v-for="category in availableCategories" :key="category.id"
@@ -168,31 +218,28 @@ async function save() {
           {{ category.title_uk }}</label
         >
       </fieldset>
-      <fieldset>
-        <legend>SEO</legend>
-        <label>SEO title <input v-model="form.seoTitleUk" /></label>
-        <label>SEO description <textarea v-model="form.seoDescriptionUk" rows="3" /></label>
-        <label>SEO title English <input v-model="form.seoTitleEn" /></label>
-        <label>SEO description English <textarea v-model="form.seoDescriptionEn" rows="3" /></label>
-      </fieldset>
       <AdminGallery v-model="form.mediaIds" />
-      <label
-        >Статус
-        <select v-model="form.status">
-          <option>draft</option>
-          <option>published</option>
-          <option>archived</option>
-        </select></label
-      >
-      <button :disabled="saving">{{ saving ? 'Збереження…' : 'Зберегти' }}</button>
-      <a
-        v-if="id"
-        class="button"
-        :href="`/api/admin/posts/${id}/preview`"
-        target="_blank"
-        rel="noopener"
-        >Preview</a
-      >
+      <div class="admin-editor-actions">
+        <label
+          >Статус
+          <select v-model="form.status">
+            <option>draft</option>
+            <option>published</option>
+            <option>archived</option>
+          </select></label
+        >
+        <div class="admin-editor-actions-buttons">
+          <button :disabled="saving">{{ saving ? 'Збереження…' : 'Зберегти' }}</button>
+          <a
+            v-if="id"
+            class="button admin-secondary-button"
+            :href="`/api/admin/posts/${id}/preview`"
+            target="_blank"
+            rel="noopener"
+            >Переглянути</a
+          >
+        </div>
+      </div>
     </form>
   </section>
 </template>

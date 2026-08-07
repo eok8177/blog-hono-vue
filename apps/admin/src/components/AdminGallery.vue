@@ -63,11 +63,17 @@ onMounted(async () => {
 </script>
 
 <template>
-  <fieldset>
+  <fieldset class="admin-editor-section admin-gallery">
     <legend>Галерея</legend>
-    <p v-if="!availableMedia.length">Спочатку завантажте зображення в Медіатеці.</p>
+    <p v-if="!availableMedia.length" class="admin-gallery-empty">
+      Спочатку завантажте зображення в Медіатеці.
+    </p>
     <template v-else>
-      <div class="admin-gallery-toolbar">
+      <div class="admin-gallery-heading">
+        <p>Оберіть зображення для публікації.</p>
+        <span>{{ modelValue.length }} обрано</span>
+      </div>
+      <div class="admin-gallery-toolbar" aria-label="Фільтр медіатеки">
         <button
           type="button"
           class="admin-gallery-tab"
@@ -97,11 +103,17 @@ onMounted(async () => {
         </button>
       </div>
       <div class="admin-gallery-grid">
-        <label v-for="item in filteredMedia" :key="item.id" class="admin-gallery-item">
+        <label
+          v-for="item in filteredMedia"
+          :key="item.id"
+          class="admin-gallery-item"
+          :class="{ 'admin-gallery-item-selected': modelValue.includes(item.id) }"
+        >
           <input
             type="checkbox"
             :checked="modelValue.includes(item.id)"
             class="admin-gallery-checkbox"
+            :aria-label="`Обрати зображення: ${item.alt_uk}`"
             @change="toggle(item.id)"
           />
           <img

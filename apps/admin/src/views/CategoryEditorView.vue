@@ -24,6 +24,7 @@ const error = ref('');
 const saving = ref(false);
 const loading = ref(Boolean(id));
 const dirty = ref(false);
+const activeLocale = ref<'uk' | 'en'>('uk');
 
 type StoredCategory = {
   slug: string;
@@ -116,32 +117,77 @@ async function save() {
           >Згенерується з назви автоматично</small
         ></label
       >
-      <div class="admin-form-grid">
-        <label>Назва українською <input v-model="form.titleUk" required /></label>
-        <label>Title English <input v-model="form.titleEn" /></label>
-      </div>
-      <label>Опис українською <textarea v-model="form.descriptionMdUk" rows="5" /></label>
-      <label>Description English <textarea v-model="form.descriptionMdEn" rows="5" /></label>
-      <div class="admin-form-actions">
-        <label class="admin-checkbox"
-          ><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label
+      <section class="admin-language-section" aria-label="Мовні версії категорії">
+        <div class="admin-language-tabs" role="tablist" aria-label="Мова категорії">
+          <button
+            id="category-locale-uk-tab"
+            class="admin-language-tab"
+            :class="{ 'admin-language-tab-active': activeLocale === 'uk' }"
+            type="button"
+            role="tab"
+            :aria-selected="activeLocale === 'uk'"
+            aria-controls="category-locale-uk-panel"
+            @click="activeLocale = 'uk'"
+          >
+            Українська
+          </button>
+          <button
+            id="category-locale-en-tab"
+            class="admin-language-tab"
+            :class="{ 'admin-language-tab-active': activeLocale === 'en' }"
+            type="button"
+            role="tab"
+            :aria-selected="activeLocale === 'en'"
+            aria-controls="category-locale-en-panel"
+            @click="activeLocale = 'en'"
+          >
+            English
+          </button>
+        </div>
+        <div
+          id="category-locale-uk-panel"
+          v-show="activeLocale === 'uk'"
+          class="admin-language-panel"
+          role="tabpanel"
+          aria-labelledby="category-locale-uk-tab"
         >
-        <label class="admin-checkbox"
-          ><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label
+          <label>Назва українською <input v-model="form.titleUk" required /></label>
+          <label>Опис українською <textarea v-model="form.descriptionMdUk" rows="5" /></label>
+        </div>
+        <div
+          id="category-locale-en-panel"
+          v-show="activeLocale === 'en'"
+          class="admin-language-panel"
+          role="tabpanel"
+          aria-labelledby="category-locale-en-tab"
         >
-        <label>
-          Порядок у меню <input v-model.number="form.menuOrder" type="number" min="0" />
-        </label>
-        <label
-          >Статус
-          <select v-model="form.status">
-            <option>draft</option>
-            <option>published</option>
-            <option>archived</option>
-          </select></label
-        >
-        <button :disabled="saving">{{ saving ? 'Збереження…' : 'Зберегти' }}</button>
-      </div>
+          <label>Title English <input v-model="form.titleEn" /></label>
+          <label>Description English <textarea v-model="form.descriptionMdEn" rows="5" /></label>
+          <label class="admin-checkbox"
+            ><input v-model="form.isEnPublished" type="checkbox" /> English опубліковано</label
+          >
+        </div>
+      </section>
+      <fieldset class="admin-editor-section admin-editor-settings">
+        <legend>Налаштування категорії</legend>
+        <div class="admin-editor-settings-grid">
+          <label class="admin-checkbox"
+            ><input v-model="form.showInMenu" type="checkbox" /> Показувати в меню</label
+          >
+          <label>
+            Порядок у меню <input v-model.number="form.menuOrder" type="number" min="0" />
+          </label>
+          <label
+            >Статус
+            <select v-model="form.status">
+              <option>draft</option>
+              <option>published</option>
+              <option>archived</option>
+            </select></label
+          >
+          <button :disabled="saving">{{ saving ? 'Збереження…' : 'Зберегти' }}</button>
+        </div>
+      </fieldset>
     </form>
   </section>
 </template>
