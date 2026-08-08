@@ -109,6 +109,19 @@ app.get('/assets/public.css', (c) =>
     'Cache-Control': 'public, max-age=86400',
   }),
 );
+const brandAssetPaths = [
+  '/favicon.svg',
+  '/favicon.ico',
+  '/favicon-96x96.png',
+  '/apple-touch-icon.png',
+  '/site.webmanifest',
+  '/web-app-manifest-192x192.png',
+  '/web-app-manifest-512x512.png',
+];
+for (const path of brandAssetPaths) {
+  app.get(path, (c) => c.env.ASSETS.fetch(new Request(new URL(path, c.req.url))));
+  app.get(`/admin${path}`, (c) => c.env.ASSETS.fetch(new Request(new URL(path, c.req.url))));
+}
 app.get('/robots.txt', (c) =>
   c.text('User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/admin\n'),
 );

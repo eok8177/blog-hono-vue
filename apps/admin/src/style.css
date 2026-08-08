@@ -133,7 +133,7 @@ th,
   height: 2.5rem;
   place-items: center;
   color: var(--specimen);
-  background: var(--paper);
+  background: transparent;
   font-family: 'Source Serif 4', serif;
   font-size: 1.45rem;
   font-weight: 600;
@@ -1574,4 +1574,28 @@ label {
   color: var(--ink);
   background: #172019;
   border-color: var(--line);
+}
+:root[data-theme='dark'] .milkdown-editor-host {
+  color-scheme: dark;
+  background: var(--white);
+  border-color: var(--line);
+}
+:root[data-theme='dark'] .milkdown-editor-host .milkdown {
+  --crepe-color-background: var(--white);
+  --crepe-color-on-background: var(--ink);
+  --crepe-color-surface: #26352b;
+  --crepe-color-surface-low: #1b2820;
+  --crepe-color-on-surface: var(--ink);
+  --crepe-color-on-surface-variant: var(--muted);
+  --crepe-color-outline: #718071;
+  --crepe-color-primary: var(--reed-ink);
+  --crepe-color-secondary: #3d503f;
+  --crepe-color-on-secondary: var(--ink);
+  --crepe-color-inverse: var(--ink);
+  --crepe-color-on-inverse: var(--paper);
+  --crepe-color-inline-code: var(--ochre-ink);
+  --crepe-color-error: #f08c7d;
+  --crepe-color-hover: #2d3b2e;
+  --crepe-color-selected: #3a4d3e;
+  --crepe-color-inline-area: #344437;
 }

@@ -320,21 +320,10 @@ export const publicCss = String.raw`
     line-height: 1.15;
   }
   .wordmark-mark {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-sm);
-    color: var(--accent);
-    font-family: var(--serif);
-    font-size: 1.25rem;
-    font-style: italic;
-    transition: background .2s ease, color .2s ease;
-  }
-  .wordmark:hover .wordmark-mark {
-    background: var(--accent);
-    color: var(--on-accent);
+    display: block;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
   }
   .wordmark strong {
     display: block;

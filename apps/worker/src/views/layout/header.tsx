@@ -1,5 +1,7 @@
 import type { FC } from 'hono/jsx';
 
+import { FaunaLogo } from './fauna-logo';
+
 export const Header: FC<{
   lang: 'uk' | 'en';
   brand: string;
@@ -15,9 +17,7 @@ export const Header: FC<{
         aria-label={lang === 'uk' ? 'Основна навігація' : 'Primary navigation'}
       >
         <a class="wordmark" href={lang === 'uk' ? '/' : '/en/'}>
-          <span class="wordmark-mark" aria-hidden="true">
-            F
-          </span>
+          <FaunaLogo />
           <span>
             <strong>{brand}</strong>
             <small>{lang === 'uk' ? 'південь України' : 'southern Ukraine'}</small>

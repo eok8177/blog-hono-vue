@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import CatalogueIcon from './components/CatalogueIcon.vue';
+import FaunaLogo from './components/FaunaLogo.vue';
 
 const route = useRoute();
 const sidebarOpen = ref(false);
@@ -53,7 +54,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onDocumentKeydown)
     <div v-if="sidebarOpen" class="admin-sidebar-backdrop" @click="closeSidebar" />
     <aside class="admin-sidebar" :class="{ 'admin-sidebar-open': sidebarOpen }">
       <div class="admin-brand">
-        <span class="admin-brand-mark" aria-hidden="true">F</span>
+        <FaunaLogo class="admin-brand-mark" aria-hidden="true" />
         <span><strong>Fauna</strong><small>Польовий каталог</small></span>
         <button
           class="admin-sidebar-close"

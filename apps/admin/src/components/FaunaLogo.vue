@@ -1,0 +1,59 @@
+<template>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="64"
+    height="64"
+    viewBox="0 0 64 64"
+    fill="none"
+    role="img"
+    aria-label="Fauna"
+  >
+    <defs>
+      <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#F9A825" />
+        <stop offset="100%" stop-color="#F57C00" />
+      </linearGradient>
+      <linearGradient id="sand1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#F8D66D" />
+        <stop offset="100%" stop-color="#E8B73F" />
+      </linearGradient>
+      <linearGradient id="sand2" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#F4C54C" />
+        <stop offset="100%" stop-color="#D99B1E" />
+      </linearGradient>
+    </defs>
+
+    <circle cx="44" cy="17" r="8" fill="url(#sun)" />
+
+    <path
+      d="M8 41C15 34 23 29 31 29C37 29 42 31 49 35C54 38 57 39 60 40V47H8V41Z"
+      fill="url(#sand2)"
+      stroke="#5E3B16"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+    />
+
+    <path
+      d="M6 46C13 40 19 37 27 37C33 37 38 39 46 42C52 44 57 44 60 44C57 50 50 56 40 58H21C13 56 8 52 6 46Z"
+      fill="url(#sand1)"
+      stroke="#5E3B16"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+    />
+
+    <path
+      d="M23 36C27 37 30 39 33 42C35 44 35 46 33 48C31 50 27 52 22 54"
+      stroke="#FFF3CF"
+      stroke-width="2.5"
+      stroke-linecap="round"
+    />
+
+    <path
+      d="M42 48C43 45 44 43 46 41C46 44 46 46 45 49C47 46 49 45 51 44C50 47 48 49 47 51C49 50 51 50 53 50C51 52 48 54 44 55"
+      fill="#5E3B16"
+    />
+
+    <path d="M13 23C15 22 17 22 19 23" stroke="#E9B95B" stroke-width="2" stroke-linecap="round" />
+    <path d="M12 27C15 26 18 26 21 27" stroke="#E9B95B" stroke-width="2" stroke-linecap="round" />
+  </svg>
+</template>
