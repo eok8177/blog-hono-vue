@@ -132,41 +132,41 @@ async function remove(item: Page) {
       </p>
       <p v-else-if="!items.length" class="admin-state">Записів не знайдено.</p>
       <div v-else class="catalogue-register">
-        <div class="register-row register-head" aria-hidden="true">
-          <span></span><span class="register-meta">Назва / slug</span
-          ><span class="register-meta">Шаблон</span><span class="register-meta">Статус</span
-          ><span class="register-meta">English</span><span class="register-meta">Оновлено</span
+        <div class="table-row table-head" aria-hidden="true">
+          <span></span><span class="table-meta">Назва / slug</span
+          ><span class="table-meta">Шаблон</span><span class="table-meta">Статус</span
+          ><span class="table-meta">English</span><span class="table-meta">Оновлено</span
           ><span></span>
         </div>
-        <div v-for="item in items" :key="item.id" class="register-row">
+        <div v-for="item in items" :key="item.id" class="table-row">
           <span
-            class="register-spine"
+            class="table-spine"
             :class="spineClass(item)"
             :aria-label="`${statusLabel(item.status)}${item.is_en_published ? ', English опубліковано' : ''}`"
             ><i v-if="item.status === 'published' && item.is_en_published" aria-hidden="true"></i
           ></span>
-          <div class="register-title">
+          <div class="table-title">
             <strong>{{ item.title_uk }}</strong
-            ><span class="register-slug">/{{ item.slug }}</span>
+            ><span class="table-slug">/{{ item.slug }}</span>
           </div>
-          <div class="register-meta">
-            <span class="register-label">Шаблон: </span>{{ item.template }}
+          <div class="table-meta">
+            <span class="table-label">Шаблон: </span>{{ item.template }}
           </div>
-          <div class="register-meta">
-            <span class="register-label">Статус: </span
+          <div class="table-meta">
+            <span class="table-label">Статус: </span
             ><span class="admin-status-badge" :class="`admin-status-${item.status}`">{{
               statusLabel(item.status)
             }}</span>
           </div>
           <div
-            class="register-meta"
+            class="table-meta"
             :class="item.is_en_published ? 'readiness-ready' : 'readiness-missing'"
           >
-            <span class="register-label">English: </span
+            <span class="table-label">English: </span
             >{{ item.is_en_published ? 'Опубліковано' : 'Не готово' }}
           </div>
-          <div class="register-meta">
-            <span class="register-label">Оновлено: </span
+          <div class="table-meta">
+            <span class="table-label">Оновлено: </span
             >{{ new Date(item.updated_at).toLocaleDateString('uk-UA') }}
           </div>
           <ActionMenu

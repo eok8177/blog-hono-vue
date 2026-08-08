@@ -71,8 +71,8 @@ code,
 .catalogue-mono,
 .admin-eyebrow,
 th,
-.register-slug,
-.register-meta,
+.table-slug,
+.table-meta,
 .inventory-line {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
@@ -563,6 +563,9 @@ textarea {
   border-radius: var(--radius-admin);
   font-size: 0.86rem;
 }
+input[type="search"] {
+    padding-left: 36px;
+}
 .admin-input {
   max-width: 42rem;
 }
@@ -789,24 +792,23 @@ label {
 .catalogue-register {
   overflow: visible;
 }
-.register-row {
+.table-row {
   display: grid;
   grid-template-columns:
     0.3rem minmax(15rem, 2.2fr) minmax(6rem, 0.65fr) minmax(7rem, 0.8fr)
     minmax(7rem, 0.8fr) minmax(6.5rem, 0.6fr) 2.5rem;
   align-items: center;
-  min-height: 5.5rem;
   border-bottom: 1px solid var(--line);
 }
-.register-row:last-child {
+.table-row:last-child {
   border-bottom: 0;
 }
-.register-spine {
+.table-spine {
   position: relative;
   align-self: stretch;
   background: #bfc4bc;
 }
-.register-spine i {
+.table-spine i {
   position: absolute;
   inset: 0 0 auto;
   height: 42%;
@@ -827,11 +829,11 @@ label {
 .spine-archived {
   background: #8b918b;
 }
-.register-title {
+.table-title {
   min-width: 0;
   padding: 0.75rem 1rem;
 }
-.register-title strong {
+.table-title strong {
   display: block;
   overflow: hidden;
   color: var(--ink);
@@ -841,7 +843,7 @@ label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.register-slug {
+.table-slug {
   display: block;
   overflow: hidden;
   margin-top: 0.25rem;
@@ -850,12 +852,12 @@ label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.register-meta {
+.table-meta {
   padding: 0.5rem;
   color: var(--muted);
   font-size: 0.68rem;
 }
-.register-meta strong {
+.table-meta strong {
   display: block;
   margin-bottom: 0.25rem;
   color: var(--ink);
@@ -863,7 +865,7 @@ label {
   font-size: 0.78rem;
   font-weight: 500;
 }
-.register-label {
+.table-label {
   display: none;
 }
 .admin-status-badge {
@@ -957,6 +959,7 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  margin-top: 10px;
   padding: 0.85rem 1rem;
   border-top: 1px solid var(--line);
   color: var(--muted);
@@ -1401,7 +1404,7 @@ label {
   .admin-gallery-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .register-row {
+  .table-row {
     grid-template-columns:
       0.3rem minmax(12rem, 1.8fr) minmax(6rem, 0.65fr) minmax(7rem, 0.8fr)
       minmax(6rem, 0.6fr) minmax(5.5rem, 0.6fr) 2.5rem;
@@ -1455,37 +1458,37 @@ label {
   .admin-status-text {
     display: none;
   }
-  .register-head {
+  .table-head {
     display: none;
   }
-  .register-row {
+  .table-row {
     grid-template-columns: 0.3rem minmax(0, 1fr) 2.5rem;
     min-height: 6.5rem;
   }
-  .register-row > .register-spine {
+  .table-row > .table-spine {
     grid-column: 1;
     grid-row: 1 / span 5;
   }
-  .register-row > .register-title {
+  .table-row > .table-title {
     grid-column: 2;
     grid-row: 1;
   }
-  .register-row > .register-meta {
+  .table-row > .table-meta {
     display: block;
     grid-column: 2;
     padding: 0 0.7rem 0.35rem;
   }
-  .register-row > .catalogue-action-menu {
+  .table-row > .catalogue-action-menu {
     grid-column: 3;
     grid-row: 1;
   }
-  .register-title {
+  .table-title {
     padding-left: 0.7rem;
   }
-  .register-title strong {
+  .table-title strong {
     font-size: 1rem;
   }
-  .register-label {
+  .table-label {
     display: inline;
     margin-right: 0.3rem;
     color: var(--muted);
@@ -1543,7 +1546,7 @@ label {
 }
 :root[data-theme='dark'] h1,
 :root[data-theme='dark'] h2,
-:root[data-theme='dark'] .register-title strong {
+:root[data-theme='dark'] .table-title strong {
   color: var(--ink);
 }
 :root[data-theme='dark'] .admin-list-card,

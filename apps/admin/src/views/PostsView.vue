@@ -169,42 +169,42 @@ async function remove(post: Post) {
       </p>
       <p v-else-if="!data?.items.length" class="admin-state">Записів не знайдено.</p>
       <div v-else class="catalogue-register">
-        <div class="register-row register-head" aria-hidden="true">
-          <span></span><span class="register-meta">Назва / slug</span
-          ><span class="register-meta">Категорія</span><span class="register-meta">Статус</span
-          ><span class="register-meta">English</span><span class="register-meta">Оновлено</span
+        <div class="table-row table-head" aria-hidden="true">
+          <span></span><span class="table-meta">Назва / slug</span
+          ><span class="table-meta">Категорія</span><span class="table-meta">Статус</span
+          ><span class="table-meta">English</span><span class="table-meta">Оновлено</span
           ><span></span>
         </div>
-        <div v-for="post in data.items" :key="post.id" class="register-row">
+        <div v-for="post in data.items" :key="post.id" class="table-row">
           <span
-            class="register-spine"
+            class="table-spine"
             :class="spineClass(post)"
             :aria-label="`${statusLabel(post.status)}${post.is_en_published ? ', English опубліковано' : ''}`"
             ><i v-if="post.status === 'published' && post.is_en_published" aria-hidden="true"></i
           ></span>
-          <div class="register-title">
+          <div class="table-title">
             <strong>{{ post.title_uk }}</strong
-            ><span class="register-slug">/post/{{ post.slug }}</span>
+            ><span class="table-slug">/post/{{ post.slug }}</span>
           </div>
-          <div class="register-meta">
-            <span class="register-label">Категорія: </span>{{ post.category_title ?? '—'
+          <div class="table-meta">
+            <span class="table-label">Категорія: </span>{{ post.category_title ?? '—'
             }}<span v-if="post.category_count > 1"> +{{ post.category_count - 1 }}</span>
           </div>
-          <div class="register-meta">
-            <span class="register-label">Статус: </span
+          <div class="table-meta">
+            <span class="table-label">Статус: </span
             ><span class="admin-status-badge" :class="`admin-status-${post.status}`">{{
               statusLabel(post.status)
             }}</span>
           </div>
           <div
-            class="register-meta"
+            class="table-meta"
             :class="post.is_en_published ? 'readiness-ready' : 'readiness-missing'"
           >
-            <span class="register-label">English: </span
+            <span class="table-label">English: </span
             >{{ post.is_en_published ? 'Опубліковано' : 'Не готово' }}
           </div>
-          <div class="register-meta">
-            <span class="register-label">Оновлено: </span
+          <div class="table-meta">
+            <span class="table-label">Оновлено: </span
             >{{ new Date(post.updated_at).toLocaleDateString('uk-UA') }}
           </div>
           <ActionMenu
